@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="OpenCode.ProjectManager.Core/OpenCode.ProjectManager.Core.csproj" />
+    <Project Path="OpenCode.ProjectManager.Tests/OpenCode.ProjectManager.Tests.csproj" />
+    <Project Path="OpenCode.ProjectManager/OpenCode.ProjectManager.csproj" />
+  </Folder>
+</Solution>

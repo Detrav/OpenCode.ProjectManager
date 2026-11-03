@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="OpenCode.ProjectManager.App"
+             xmlns:local="using:OpenCode.ProjectManager"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <Color x:Key="SystemAccentColor">#2563EB</Color>
+        <Color x:Key="SystemAccentColorLight1">#3B82F6</Color>
+        <Color x:Key="SystemAccentColorLight2">#60A5FA</Color>
+        <Color x:Key="SystemAccentColorLight3">#93C5FD</Color>
+        <Color x:Key="SystemAccentColorDark1">#1D4ED8</Color>
+        <Color x:Key="SystemAccentColorDark2">#1E40AF</Color>
+        <Color x:Key="SystemAccentColorDark3">#1E3A8A</Color>
+    </Application.Resources>
+
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+</Application>

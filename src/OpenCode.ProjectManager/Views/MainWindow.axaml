@@ -1,0 +1,776 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OpenCode.ProjectManager.ViewModels"
+        xmlns:models="using:OpenCode.ProjectManager.Core.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="1250"
+        d:DesignHeight="800"
+        x:Class="OpenCode.ProjectManager.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="OpenCode Project Manager"
+        Width="1250"
+        Height="800"
+        MinWidth="980"
+        MinHeight="640"
+        Background="#0E1116">
+
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="#E6EDF3" />
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#93A1B1" />
+        </Style>
+        <Style Selector="TextBlock.appTitle">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.sectionTitle">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#C9D5E1" />
+        </Style>
+        <Style Selector="TextBlock.statValue">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.mono">
+            <Setter Property="FontFamily" Value="Consolas" />
+        </Style>
+
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#151A21" />
+            <Setter Property="BorderBrush" Value="#242C36" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+        </Style>
+        <Style Selector="Border.banner">
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.banner.error">
+            <Setter Property="Background" Value="#2B1517" />
+            <Setter Property="BorderBrush" Value="#7F2A31" />
+        </Style>
+        <Style Selector="Border.banner.warning">
+            <Setter Property="Background" Value="#2A2110" />
+            <Setter Property="BorderBrush" Value="#7A5B14" />
+        </Style>
+        <Style Selector="Border.banner.info">
+            <Setter Property="Background" Value="#102132" />
+            <Setter Property="BorderBrush" Value="#1F4F7A" />
+        </Style>
+        <Style Selector="Border.stat">
+            <Setter Property="Background" Value="#1B222B" />
+            <Setter Property="BorderBrush" Value="#2A3340" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="Width" Value="148" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="#1F2A37" />
+            <Setter Property="BorderBrush" Value="#344054" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+        </Style>
+        <Style Selector="Border.section">
+            <Setter Property="Background" Value="#11161D" />
+            <Setter Property="BorderBrush" Value="#222A34" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="Border.dangerZone">
+            <Setter Property="Background" Value="#1E1417" />
+            <Setter Property="BorderBrush" Value="#5B252B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+        </Style>
+
+        <Style Selector="Button">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Background" Value="#202A35" />
+            <Setter Property="Foreground" Value="#E6EDF3" />
+            <Setter Property="BorderBrush" Value="#2E3A48" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Button.accent">
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="BorderBrush" Value="#3B82F6" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.danger">
+            <Setter Property="Background" Value="#B42318" />
+            <Setter Property="BorderBrush" Value="#D92D20" />
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.ghost">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="#2E3A48" />
+            <Setter Property="Foreground" Value="#C9D5E1" />
+        </Style>
+
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#10151B" />
+            <Setter Property="Foreground" Value="#E6EDF3" />
+            <Setter Property="BorderBrush" Value="#2A3340" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="MinHeight" Value="34" />
+        </Style>
+
+        <Style Selector="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="24,20,24,12">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="OpenCode Project Manager" Classes="appTitle" />
+                    <TextBlock Text="Inspect and permanently remove projects from an OpenCode 2 database"
+                               Classes="muted" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="Backup now"
+                            Classes="ghost"
+                            Command="{Binding BackupNowCommand}"
+                            IsEnabled="{Binding HasDatabase}" />
+                    <Button Content="Open folder"
+                            Classes="ghost"
+                            Command="{Binding OpenDatabaseFolderCommand}"
+                            IsEnabled="{Binding HasDatabase}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Database selector -->
+        <Border Grid.Row="1" Padding="24,0,24,12">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                <TextBox x:Name="DatabasePathBox"
+                         Text="{Binding DatabasePath}"
+                         PlaceholderText="Path to opencode.db"
+                         KeyDown="DatabasePathBox_KeyDown"
+                         VerticalContentAlignment="Center" />
+                <Button Grid.Column="1" Content="Browse…" Click="BrowseButton_Click" />
+                <Button Grid.Column="2" Content="Load" Classes="accent" Command="{Binding ReloadCommand}" />
+                <Button Grid.Column="3" Content="Copy path" Classes="ghost" Click="CopyDatabasePath_Click" />
+            </Grid>
+        </Border>
+
+        <!-- Banners -->
+        <StackPanel Grid.Row="2" Margin="24,0,24,12" Spacing="8">
+            <Border Classes="banner error" IsVisible="{Binding IsErrorVisible}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <SelectableTextBlock Text="{Binding ErrorMessage}"
+                                         TextWrapping="Wrap"
+                                         Foreground="#FFB4AB"
+                                         VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Content="Dismiss"
+                            Classes="ghost"
+                            Command="{Binding DismissErrorCommand}"
+                            Margin="12,0,0,0" />
+                </Grid>
+            </Border>
+
+            <Border Classes="banner warning" IsVisible="{Binding IsSchemaWarningVisible}">
+                <SelectableTextBlock Text="{Binding SchemaWarning}"
+                                     TextWrapping="Wrap"
+                                     Foreground="#F2CC60" />
+            </Border>
+
+            <Border Classes="banner warning" IsVisible="{Binding IsOpenCodeRunning}">
+                <StackPanel Spacing="3">
+                    <TextBlock Text="OpenCode is running"
+                               FontWeight="SemiBold"
+                               Foreground="#F2CC60" />
+                    <TextBlock Text="Database changes are blocked while OpenCode is running. Close it, then use “Check again”."
+                               Classes="muted"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="banner info" IsVisible="{Binding ReadOnlyMode}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="Read-only mode: deletion is disabled."
+                               Foreground="#8CC8FF"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1"
+                            Content="Enable changes"
+                            Classes="ghost"
+                            Command="{Binding EnableWriteModeCommand}"
+                            IsVisible="{Binding CanEnableWriteMode}"
+                            Margin="12,0,0,0" />
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Main content -->
+        <Grid Grid.Row="3" ColumnDefinitions="380,16,*" Margin="24,0,24,16">
+
+            <!-- Project list -->
+            <Border Grid.Column="0" Classes="card">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="16,16,16,10" Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Projects" Classes="sectionTitle" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ProjectCountDisplay}"
+                                       Classes="muted"
+                                       FontSize="11"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBox Text="{Binding SearchText}"
+                                 PlaceholderText="Search by name, path, VCS or ID" />
+                    </StackPanel>
+
+                    <Grid Margin="8,0,8,8">
+                        <ListBox x:Name="ProjectList"
+                                 ItemsSource="{Binding FilteredProjects}"
+                                 SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                                 SelectionMode="Single"
+                                 SelectionChanged="ProjectList_SelectionChanged"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:ProjectRecord">
+                                    <Border Padding="10" CornerRadius="8">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="14"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding PathDisplay}"
+                                                           Classes="muted"
+                                                           FontSize="11"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1"
+                                                        Spacing="4"
+                                                        HorizontalAlignment="Right"
+                                                        VerticalAlignment="Center">
+                                                <Border Classes="badge" HorizontalAlignment="Right">
+                                                    <TextBlock Text="{Binding StateDisplay}"
+                                                               FontSize="10"
+                                                               Classes="muted" />
+                                                </Border>
+                                                <TextBlock Text="{Binding SessionsDisplay}"
+                                                           Classes="muted"
+                                                           FontSize="10"
+                                                           HorizontalAlignment="Right" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <StackPanel IsVisible="{Binding IsNoDatabaseVisible}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="6"
+                                    Margin="24">
+                            <TextBlock Text="No database loaded"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Choose an OpenCode 2 opencode.db file above."
+                                       Classes="muted"
+                                       TextWrapping="Wrap"
+                                       TextAlignment="Center" />
+                        </StackPanel>
+
+                        <TextBlock IsVisible="{Binding IsEmptyProjectsVisible}"
+                                   Text="No projects match the filter."
+                                   Classes="muted"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </DockPanel>
+            </Border>
+
+            <!-- Project details -->
+            <Border Grid.Column="2" Classes="card">
+                <Grid>
+                    <ScrollViewer x:Name="DetailsScrollViewer" IsVisible="{Binding HasSelection}">
+                        <StackPanel Margin="20" Spacing="16">
+
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding SelectedDetails.Project.DisplayName}"
+                                               Classes="title"
+                                               TextWrapping="Wrap" />
+                                    <SelectableTextBlock Text="{Binding SelectedDetails.Project.PathDisplay}"
+                                                         Classes="muted"
+                                                         TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Spacing="5"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Margin="16,0,0,0">
+                                    <Border Classes="badge" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding SelectedDetails.Project.StateDisplay}"
+                                                   FontSize="10"
+                                                   Classes="muted" />
+                                    </Border>
+                                    <TextBlock Text="{Binding SelectedDetails.Project.Id}"
+                                               Classes="muted mono"
+                                               FontSize="10"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="240"
+                                               TextAlignment="Right" />
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel IsVisible="{Binding IsDetailsLoading}" Spacing="6">
+                                <TextBlock Text="Loading project details…" Classes="muted" FontSize="12" />
+                                <ProgressBar IsIndeterminate="True" Height="3" />
+                            </StackPanel>
+
+                            <WrapPanel>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Sessions" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.Project.TotalSessionCount}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="{Binding SelectedDetails.Project.SessionsDisplay}"
+                                                   Classes="muted"
+                                                   FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Messages" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.MessagesDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="V2 + legacy" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Worktrees" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.Project.WorktreeCount}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="git worktrees / clones" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Permissions" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.PermissionsDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="saved rules" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Schedules" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.SchedulesDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="project sessions" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Jobs" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.JobsDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="background jobs" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Event streams" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.EventSequencesDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="removed manually" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Classes="stat">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Blob refs" Classes="muted" FontSize="10" />
+                                        <TextBlock Text="{Binding SelectedDetails.BlobReferencesDisplay}"
+                                                   Classes="statValue" />
+                                        <TextBlock Text="media references" Classes="muted" FontSize="10" />
+                                    </StackPanel>
+                                </Border>
+                            </WrapPanel>
+
+                            <Border Classes="banner info" IsVisible="{Binding SelectedDetails.Project.IsGlobal}">
+                                <TextBlock Text="Built-in global project. It is shown as a separate project and its sessions can be deleted, but the project row itself is kept."
+                                           Foreground="#8CC8FF"
+                                           TextWrapping="Wrap" />
+                            </Border>
+
+                            <Border Classes="banner warning" IsVisible="{Binding SelectedDetails.Project.IsFolderMissing}">
+                                <TextBlock Text="The project folder no longer exists. The database record can still be removed."
+                                           Foreground="#F2CC60"
+                                           TextWrapping="Wrap" />
+                            </Border>
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Metadata" Classes="sectionTitle" />
+                                    <Border Classes="section">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto"
+                                              ColumnSpacing="10" RowSpacing="5">
+                                            <TextBlock Text="VCS" Classes="muted" FontSize="11" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding SelectedDetails.Project.VcsDisplay}"
+                                                       FontSize="11" />
+                                            <TextBlock Grid.Row="1" Text="Created" Classes="muted" FontSize="11" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                                       Text="{Binding SelectedDetails.Project.CreatedDisplay}"
+                                                       FontSize="11" />
+                                            <TextBlock Grid.Row="2" Text="Last active" Classes="muted" FontSize="11" />
+                                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                                       Text="{Binding SelectedDetails.Project.LastActiveDisplay}"
+                                                       FontSize="11" />
+                                            <TextBlock Grid.Row="3" Text="Archived" Classes="muted" FontSize="11" />
+                                            <TextBlock Grid.Row="3" Grid.Column="1"
+                                                       Text="{Binding SelectedDetails.Project.ArchivedDisplay}"
+                                                       FontSize="11" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <TextBlock Text="Database" Classes="sectionTitle" />
+                                    <Border Classes="section">
+                                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                                              ColumnSpacing="10" RowSpacing="5">
+                                            <TextBlock Text="File" Classes="muted" FontSize="11" />
+                                            <SelectableTextBlock Grid.Column="1"
+                                                                 Text="{Binding DatabasePathDisplay}"
+                                                                 FontSize="11"
+                                                                 TextWrapping="Wrap" />
+                                            <TextBlock Grid.Row="1" Text="Size" Classes="muted" FontSize="11" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                                       Text="{Binding DatabaseSizeDisplay}"
+                                                       FontSize="11" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Worktrees" Classes="sectionTitle" />
+                                <Border Classes="section">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="No worktree rows."
+                                                   Classes="muted"
+                                                   FontSize="11"
+                                                   IsVisible="{Binding !SelectedDetails.HasWorktrees}" />
+                                        <ItemsControl ItemsSource="{Binding SelectedDetails.Worktrees}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:WorktreeRecord">
+                                                    <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                        <SelectableTextBlock Text="{Binding DirectoryDisplay}"
+                                                                             FontSize="11"
+                                                                             TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding StrategyDisplay}"
+                                                                   Classes="muted"
+                                                                   FontSize="10"
+                                                                   Margin="10,0,0,0" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Legacy directories" Classes="sectionTitle" />
+                                    <Border Classes="section">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="No legacy directory rows."
+                                                       Classes="muted"
+                                                       FontSize="11"
+                                                       IsVisible="{Binding !SelectedDetails.HasLegacyDirectories}" />
+                                            <ItemsControl ItemsSource="{Binding SelectedDetails.LegacyDirectories}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:ProjectDirectoryRecord">
+                                                        <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                                            <SelectableTextBlock Text="{Binding DirectoryDisplay}"
+                                                                                 FontSize="11"
+                                                                                 TextWrapping="Wrap" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding TypeDisplay}"
+                                                                       Classes="muted"
+                                                                       FontSize="10"
+                                                                       Margin="10,0,0,0" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <TextBlock Text="Sandboxes" Classes="sectionTitle" />
+                                    <Border Classes="section">
+                                        <SelectableTextBlock Text="{Binding SelectedDetails.SandboxesDisplay}"
+                                                             FontSize="11"
+                                                             TextWrapping="Wrap" />
+                                    </Border>
+                                    <TextBlock Text="Worktree startup command" Classes="sectionTitle" Margin="0,6,0,0" />
+                                    <Border Classes="section">
+                                        <SelectableTextBlock Text="{Binding SelectedDetails.StartupCommandDisplay}"
+                                                             FontSize="11"
+                                                             TextWrapping="Wrap" />
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Classes="dangerZone">
+                                <Grid>
+                                    <!-- Regular project -->
+                                    <StackPanel Spacing="8" IsVisible="{Binding !SelectedDetails.Project.IsGlobal}">
+                                        <TextBlock Text="Danger zone"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#FFB4AB" />
+                                        <TextBlock Text="Permanently removes the project and every session, message, worktree row and event stream that belongs to it. The folder on disk is not touched."
+                                                   Classes="muted"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap" />
+                                        <Button Content="Delete project permanently…"
+                                                Classes="danger"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding ShowDeleteConfirmationCommand}"
+                                                IsEnabled="{Binding CanDelete}" />
+                                        <TextBlock Text="Deletion is disabled while OpenCode is running or while read-only mode is active."
+                                                   Classes="muted"
+                                                   FontSize="10"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+
+                                    <!-- Built-in global project: sessions only -->
+                                    <StackPanel Spacing="8" IsVisible="{Binding SelectedDetails.Project.IsGlobal}">
+                                        <TextBlock Text="Global sessions"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#FFB4AB" />
+                                        <TextBlock Text="The global project row cannot be removed, but every session in it can be deleted. Worktrees, permissions and the project row are kept."
+                                                   Classes="muted"
+                                                   FontSize="11"
+                                                   TextWrapping="Wrap" />
+                                        <Button Content="Delete all global sessions…"
+                                                Classes="danger"
+                                                HorizontalAlignment="Left"
+                                                Command="{Binding ShowDeleteSessionsConfirmationCommand}"
+                                                IsEnabled="{Binding CanDeleteSessions}" />
+                                        <TextBlock Text="Session deletion is disabled while OpenCode is running or while read-only mode is active."
+                                                   Classes="muted"
+                                                   FontSize="10"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <StackPanel IsVisible="{Binding IsDetailsPlaceholderVisible}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                Margin="30">
+                        <TextBlock Text="Select a project"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Project metadata, sessions, worktrees and the delete action appear here."
+                                   Classes="muted"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   MaxWidth="360" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="4"
+                Background="#11161D"
+                BorderBrush="#222A34"
+                BorderThickness="0,1,0,0"
+                Padding="24,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="2">
+                    <SelectableTextBlock Text="{Binding StatusMessage}"
+                                         FontSize="12"
+                                         TextWrapping="Wrap" />
+                    <SelectableTextBlock Text="{Binding BackupStatusDisplay}"
+                                         Classes="muted"
+                                         FontSize="10"
+                                         TextWrapping="Wrap" />
+                </StackPanel>
+                <ProgressBar Grid.Column="1"
+                             Width="140"
+                             Height="4"
+                             IsIndeterminate="True"
+                             IsVisible="{Binding IsBusy}"
+                             VerticalAlignment="Center"
+                             Margin="16,0,0,0" />
+            </Grid>
+        </Border>
+
+        <!-- Blocking overlay: OpenCode is running -->
+        <Border Grid.RowSpan="5" Background="#E60A0D12" IsVisible="{Binding IsBlockingOverlayVisible}">
+            <Border Background="#151A21"
+                    BorderBrush="#5B252B"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="28"
+                    MaxWidth="720"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="OpenCode is running"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="#FFB4AB" />
+                    <TextBlock Text="The database must not be modified while OpenCode or the OpenCode service is running. Close all OpenCode processes and check again. You can also continue in read-only mode to inspect projects."
+                               TextWrapping="Wrap"
+                               Classes="muted" />
+                    <Border Background="#10151B"
+                            BorderBrush="#2A3340"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+                        <SelectableTextBlock Text="{Binding RunningProcessesText}"
+                                             FontFamily="Consolas"
+                                             FontSize="11"
+                                             TextWrapping="Wrap" />
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="Continue read-only"
+                                Classes="ghost"
+                                Command="{Binding ContinueReadOnlyCommand}" />
+                        <Button Content="Check again"
+                                Classes="accent"
+                                Command="{Binding RefreshProcessesCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Delete confirmation overlay -->
+        <Border Grid.RowSpan="5" Background="#E60A0D12" IsVisible="{Binding IsDeleteConfirmationVisible}">
+            <Border Background="#151A21"
+                    BorderBrush="#5B252B"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="28"
+                    MaxWidth="760"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Delete project permanently?"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="#FFB4AB" />
+                    <TextBlock Text="This removes the project and all of its sessions from the OpenCode database. It cannot be undone from the app; the one-time backup is your recovery path."
+                               TextWrapping="Wrap"
+                               Classes="muted" />
+                    <Border Background="#10151B"
+                            BorderBrush="#2A3340"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+                        <SelectableTextBlock Text="{Binding DeletePreviewText}"
+                                             FontFamily="Consolas"
+                                             FontSize="11"
+                                             TextWrapping="Wrap" />
+                    </Border>
+                    <CheckBox IsChecked="{Binding DeleteConfirmed, Mode=TwoWay}"
+                              Content="I understand that the project and all of its sessions will be deleted."
+                              Foreground="#E6EDF3" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Classes="ghost"
+                                Command="{Binding CancelDeleteCommand}" />
+                        <Button Content="Delete permanently"
+                                Classes="danger"
+                                Command="{Binding ConfirmDeleteCommand}"
+                                IsEnabled="{Binding CanConfirmDelete}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- Global sessions confirmation overlay -->
+        <Border Grid.RowSpan="5" Background="#E60A0D12" IsVisible="{Binding IsDeleteSessionsConfirmationVisible}">
+            <Border Background="#151A21"
+                    BorderBrush="#5B252B"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="28"
+                    MaxWidth="760"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Delete all global sessions?"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="#FFB4AB" />
+                    <TextBlock Text="This removes every session from the built-in global project, including archived sessions. The project row, worktrees, permissions and the folder on disk are kept."
+                               TextWrapping="Wrap"
+                               Classes="muted" />
+                    <Border Background="#10151B"
+                            BorderBrush="#2A3340"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+                        <SelectableTextBlock Text="{Binding DeleteSessionsPreviewText}"
+                                             FontFamily="Consolas"
+                                             FontSize="11"
+                                             TextWrapping="Wrap" />
+                    </Border>
+                    <CheckBox IsChecked="{Binding DeleteSessionsConfirmed, Mode=TwoWay}"
+                              Content="I understand that all global sessions will be deleted."
+                              Foreground="#E6EDF3" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Classes="ghost"
+                                Command="{Binding CancelDeleteSessionsCommand}" />
+                        <Button Content="Delete sessions"
+                                Classes="danger"
+                                Command="{Binding ConfirmDeleteSessionsCommand}"
+                                IsEnabled="{Binding CanConfirmDeleteSessions}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</Window>
