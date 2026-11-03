@@ -34,6 +34,10 @@ public sealed class OpenCodeDatabaseTests
 
         var global = Assert.Single(snapshot.Projects, project => project.Id == "global");
         Assert.True(global.IsGlobal);
+
+        var globalSession = Assert.Single(snapshot.GlobalSessions);
+        Assert.Equal("ses_global_1", globalSession.Id);
+        Assert.Equal("Global one", globalSession.DisplayName);
     }
 
     [Fact]
@@ -61,7 +65,7 @@ public sealed class OpenCodeDatabaseTests
         using var database = new TestDatabase();
         database.Create();
 
-        var result = new OpenCodeDatabase(database.DatabasePath).DeleteProject("prj_a", backupPath: "backup.db");
+        var result = new OpenCodeDatabase(database.DatabasePath).DeleteProject("prj_a");
 
         Assert.Equal(2, result.SessionsV2);
         Assert.Equal(1, result.SessionsV1);
@@ -71,7 +75,6 @@ public sealed class OpenCodeDatabaseTests
         Assert.Equal(4, result.EventSequences);
         Assert.Equal(1, result.Jobs);
         Assert.Equal(1, result.OrphanedBlobs);
-        Assert.Equal("backup.db", result.BackupPath);
 
         Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM project WHERE id = 'prj_a';"));
         Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session_v2 WHERE project_id = 'prj_a';"));
@@ -97,33 +100,34 @@ public sealed class OpenCodeDatabaseTests
     }
 
     [Fact]
-    public void DeleteSessions_KeepsProjectAndItsMetadata()
+    public void DeleteSession_DeletesOnlySelectedGlobalSession()
     {
         using var database = new TestDatabase();
         database.Create();
 
-        var result = new OpenCodeDatabase(database.DatabasePath).DeleteSessions("global", backupPath: "backup.db");
+        var result = new OpenCodeDatabase(database.DatabasePath).DeleteSession("ses_global_1");
 
-        Assert.Equal(1, result.SessionsV2);
+        Assert.Equal("Global one", result.ProjectName);
+        Assert.Equal(2, result.SessionsV2);
         Assert.Equal(1, result.SessionsV1);
-        Assert.Equal(2, result.Messages);
+        Assert.Equal(3, result.Messages);
         Assert.Equal(2, result.EventSequences);
         Assert.Equal(1, result.Jobs);
         Assert.Equal(1, result.OrphanedBlobs);
 
-        // The project row, worktrees and permissions are kept.
+        // The global project row, worktrees and permissions are kept.
         Assert.Equal(1, database.Scalar("SELECT COUNT(*) FROM project WHERE id = 'global';"));
         Assert.Equal(1, database.Scalar("SELECT COUNT(*) FROM worktree WHERE project_id = 'global';"));
         Assert.Equal(1, database.Scalar("SELECT COUNT(*) FROM permission WHERE project_id = 'global';"));
 
-        // Sessions and their dependants are gone.
-        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session_v2 WHERE project_id = 'global';"));
-        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session WHERE project_id = 'global';"));
-        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session_message WHERE session_id = 'ses_global_1';"));
-        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM message WHERE session_id = 'ses_global_legacy';"));
+        // The selected root session, its child and their dependants are gone.
+        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session_v2 WHERE id IN ('ses_global_1','ses_global_child');"));
+        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session WHERE id = 'ses_global_1';"));
+        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM session_message WHERE session_id IN ('ses_global_1','ses_global_child');"));
+        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM message WHERE session_id = 'ses_global_1';"));
         Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM schedule WHERE id = 'sched_global';"));
         Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM job WHERE id = 'job_global';"));
-        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM event_sequence WHERE aggregate_id IN ('ses_global_1','ses_global_legacy');"));
+        Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM event_sequence WHERE aggregate_id IN ('ses_global_1','ses_global_child');"));
         Assert.Equal(0, database.Scalar("SELECT COUNT(*) FROM blob WHERE hash = 'global_only';"));
         Assert.Equal(1, database.Scalar("SELECT COUNT(*) FROM blob WHERE hash = 'shared';"));
 
@@ -151,24 +155,25 @@ public sealed class OpenCodeDatabaseTests
         database.Create();
 
         var exception = Assert.Throws<OpenCodeDatabaseException>(() =>
-            new OpenCodeDatabase(database.DatabasePath).DeleteProject("global", backupPath: null));
+            new OpenCodeDatabase(database.DatabasePath).DeleteProject("global"));
 
         Assert.Contains("global", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, database.Scalar("SELECT COUNT(*) FROM project WHERE id = 'global';"));
     }
 
     [Fact]
-    public void Backup_IsCreatedOncePerDatabase()
+    public void Backup_CreatesNewFileEachCall()
     {
         using var database = new TestDatabase();
         database.Create();
 
         var service = new BackupService();
-        var first = service.EnsureBackup(database.DatabasePath);
-        var second = service.EnsureBackup(database.DatabasePath);
+        var first = service.CreateBackup(database.DatabasePath);
+        var second = service.CreateBackup(database.DatabasePath);
 
-        Assert.Equal(first, second);
+        Assert.NotEqual(first, second);
         Assert.True(File.Exists(first));
+        Assert.True(File.Exists(second));
         Assert.True(new FileInfo(first).Length > 0);
 
         using var connection = new Microsoft.Data.Sqlite.SqliteConnection(

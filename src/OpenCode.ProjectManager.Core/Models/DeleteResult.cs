@@ -10,8 +10,7 @@ public sealed record DeleteResult(
     int Messages,
     int EventSequences,
     int Jobs,
-    int OrphanedBlobs,
-    string? BackupPath)
+    int OrphanedBlobs)
 {
     public int TotalSessions => SessionsV2 + SessionsV1;
 }

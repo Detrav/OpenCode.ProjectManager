@@ -3,59 +3,25 @@ using Microsoft.Data.Sqlite;
 namespace OpenCode.ProjectManager.Core.Services;
 
 /// <summary>
-/// Creates one consistent SQLite backup per database per application run.
+/// Creates a fresh, consistent SQLite backup every time it is called.
 /// The SQLite online backup API is used instead of a file copy so that WAL
 /// contents are included and the copy is transactionally consistent.
 /// </summary>
 public sealed class BackupService
 {
-    private readonly object _sync = new();
-    private readonly Dictionary<string, string> _backups = new(StringComparer.OrdinalIgnoreCase);
-
-    public IReadOnlyDictionary<string, string> Backups
-    {
-        get
-        {
-            lock (_sync)
-            {
-                return new Dictionary<string, string>(_backups, StringComparer.OrdinalIgnoreCase);
-            }
-        }
-    }
-
-    public string? GetExistingBackup(string databasePath)
-    {
-        lock (_sync)
-        {
-            return _backups.TryGetValue(Path.GetFullPath(databasePath), out var backup)
-                ? backup
-                : null;
-        }
-    }
-
-    public string EnsureBackup(
+    public string CreateBackup(
         string databasePath,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var fullPath = Path.GetFullPath(databasePath);
-
-        lock (_sync)
-        {
-            if (_backups.TryGetValue(fullPath, out var existing))
-            {
-                return existing;
-            }
-
-            progress?.Report("Creating a one-time database backup…");
-            var backupPath = CreateBackup(fullPath, progress, cancellationToken);
-            _backups[fullPath] = backupPath;
-            progress?.Report($"Backup created: {backupPath}");
-            return backupPath;
-        }
+        progress?.Report("Creating database backup…");
+        var backupPath = CreateBackupFile(fullPath, progress, cancellationToken);
+        progress?.Report($"Backup created: {backupPath}");
+        return backupPath;
     }
 
-    private static string CreateBackup(
+    private static string CreateBackupFile(
         string databasePath,
         IProgress<string>? progress,
         CancellationToken cancellationToken)

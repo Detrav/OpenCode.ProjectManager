@@ -2,9 +2,11 @@
 
 A small **C# + Avalonia** desktop application for inspecting and permanently deleting projects from an **OpenCode 2** SQLite database.
 
-The app works directly with `opencode.db`, validates the schema before showing data, displays projects and their related rows, and creates a consistent one-time backup before the first deletion in a run. While OpenCode is running, database changes are blocked.
+The app works directly with `opencode.db`, validates the schema before showing data, displays projects and global sessions with their related rows, and can create a consistent database backup on demand. While OpenCode is running, database changes are blocked.
 
 > This is a standalone utility, not an OpenCode plugin or a patch for OpenCode. It never deletes project folders or any other files on disk — only rows in the OpenCode database are removed.
+
+![OpenCode Project Manager](docs/screenshot.png)
 
 ## Features
 
@@ -22,9 +24,12 @@ The app works directly with `opencode.db`, validates the schema before showing d
   - V2 and legacy session counts;
   - messages, worktrees, legacy directories, permissions, schedules, jobs, blob references and event streams;
   - worktree and legacy-directory lists, sandboxes and the worktree startup command.
+- Global session details:
+  - title, path, ID, slug, agent and model;
+  - messages, parts, schedules, jobs, event streams, blob references and child-session count.
 - Permanent project deletion with confirmation.
-- The built-in **global project** is displayed as a separate project. Its project row cannot be removed, but all of its sessions can be deleted while the project, worktrees and permissions are kept.
-- One backup per database path per application run.
+- The built-in **global project** is not shown as an aggregate row. Every root session of that project is shown in the list as its own project-like entry. Deleting such an entry removes only that session and its child sessions; the global project row and all other sessions are kept.
+- Backup only through the **Backup now** button. Every click creates a new backup file.
 - Write blocking while OpenCode is detected, plus a read-only mode for inspecting data.
 
 ## Requirements
@@ -109,25 +114,29 @@ If validation fails, the app shows an error with the missing tables, columns or 
    - orphaned `blob` rows that are no longer referenced.
 4. The transaction is committed only as a whole. On failure it is rolled back.
 
-### Deleting global project sessions
+### Deleting a global session
 
-The built-in `global` project cannot be deleted, but its sessions can:
+The built-in `global` project is represented by its root sessions in the list. Deleting one of those entries:
 
-- all V2 and legacy sessions of `global` are removed;
-- messages, schedules, jobs, blob references and event streams are removed;
-- the `global` project row, its worktrees, permissions and directories are kept;
-- files on disk are never touched.
+- removes that session and its child sessions (V2 and matching legacy rows);
+- removes their messages, parts, schedules, jobs, blob references and event streams;
+- keeps the `global` project row, its worktrees, permissions and directories;
+- keeps all other global sessions;
+- never touches files on disk.
+
+The confirmation dialog and the delete button are the same as for a regular project.
 
 ### What is never removed
 
 - The project folder or any other files on disk.
-- The built-in `global` project row (only its sessions can be removed).
+- The built-in `global` project row.
 - Other projects and their sessions.
+- Other global sessions.
 - Blobs still referenced by remaining sessions.
 
 ## Backups
 
-Before the first deletion in a run, the app creates one backup per database path:
+Backups are **not created automatically**. The only way to create one is the **Backup now** button. Every click creates a new backup file:
 
 ```text
 <opencode.db directory>\opencode-project-manager-backups\opencode-YYYYMMDD-HHmmss.db
@@ -135,10 +144,8 @@ Before the first deletion in a run, the app creates one backup per database path
 
 - The SQLite Online Backup API is used, so WAL contents are included.
 - The backup is written to a temporary `*.partial` file, verified by opening it and reading `sqlite_master`, and only then renamed to the final `.db` file.
-- Free space is checked first; if there is not enough room, deletion does not start.
-- Subsequent deletions in the same run reuse the existing backup.
-- **Backup now** creates a backup ahead of time. An existing backup for the run is reused.
-- The backup reflects the database state when it was created; changes made later in the same run are not included.
+- Free space is checked first; if there is not enough room, the backup fails.
+- Deletion never creates or waits for a backup. If you want a recovery point, press **Backup now** before deleting.
 - A large database can require a backup of the same size (for example, 15 GB).
 
 ## OpenCode process guard
@@ -170,7 +177,7 @@ README.md
 
 - `DatabaseLocator` — OpenCode/XDG database discovery.
 - `OpenCodeDatabase` — schema validation, project reads, project deletion and global session deletion.
-- `BackupService` — one-time SQLite backup per database per run.
+- `BackupService` — on-demand SQLite backup; each call creates a new file.
 - `OpenCodeProcessGuard` — running OpenCode process detection.
 
 ### UI
@@ -188,11 +195,11 @@ The tests create a temporary SQLite database with the V2 and legacy schemas and 
 
 - reading projects and related entities;
 - full project deletion and cascade behavior;
-- deletion of global project sessions while keeping the project row and metadata;
-- preservation of other projects and shared blobs;
+- deletion of a single global session with its child sessions while keeping the global project row and metadata;
+- preservation of other projects, other global sessions and shared blobs;
 - refusal to delete the `global` project row;
 - rejection of an OpenCode 1-only database;
-- one-time backup creation per run.
+- creation of a new backup file on every backup call.
 
 ## Limitations
 

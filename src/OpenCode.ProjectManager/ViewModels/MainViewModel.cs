@@ -28,10 +28,13 @@ public partial class MainViewModel : ViewModelBase
     private DatabaseSnapshot? _snapshot;
 
     [ObservableProperty]
-    private ProjectRecord? _selectedProject;
+    private ProjectListItem? _selectedProject;
 
     [ObservableProperty]
     private ProjectDetails? _selectedDetails;
+
+    [ObservableProperty]
+    private GlobalSessionDetails? _selectedGlobalSessionDetails;
 
     [ObservableProperty]
     private bool _isBusy;
@@ -70,42 +73,40 @@ public partial class MainViewModel : ViewModelBase
     private string _deletePreviewText = string.Empty;
 
     [ObservableProperty]
-    private bool _isDeleteSessionsConfirmationVisible;
+    private string _deleteConfirmationTitle = "Delete permanently?";
 
     [ObservableProperty]
-    private bool _deleteSessionsConfirmed;
+    private string _deleteConfirmationDescription = string.Empty;
 
     [ObservableProperty]
-    private string _deleteSessionsPreviewText = string.Empty;
+    private string _deleteConfirmationCheckboxText = "I understand that this cannot be undone.";
+
+    [ObservableProperty]
+    private string _deleteConfirmationButtonText = "Delete permanently";
 
     [ObservableProperty]
     private string? _lastBackupPath;
 
-    public ObservableCollection<ProjectRecord> Projects { get; } = [];
+    public ObservableCollection<ProjectListItem> Projects { get; } = [];
 
-    public ObservableCollection<ProjectRecord> FilteredProjects { get; } = [];
+    public ObservableCollection<ProjectListItem> FilteredProjects { get; } = [];
 
     public bool HasDatabase => Snapshot is not null;
 
     public bool HasSelection => SelectedProject is not null;
 
+    public bool IsProjectSelected => SelectedProject is { IsProject: true };
+
+    public bool IsGlobalSessionSelected => SelectedProject is { IsGlobalSession: true };
+
     public bool CanDelete =>
-        SelectedProject is { IsGlobal: false } &&
+        SelectedProject is not null &&
         Snapshot is { IsSupported: true } &&
         !IsBusy &&
         !IsOpenCodeRunning &&
         !ReadOnlyMode;
 
     public bool CanConfirmDelete => DeleteConfirmed && CanDelete;
-
-    public bool CanDeleteSessions =>
-        SelectedProject is { IsGlobal: true, TotalSessionCount: > 0 } &&
-        Snapshot is { IsSupported: true } &&
-        !IsBusy &&
-        !IsOpenCodeRunning &&
-        !ReadOnlyMode;
-
-    public bool CanConfirmDeleteSessions => DeleteSessionsConfirmed && CanDeleteSessions;
 
     public bool IsNoDatabaseVisible => !HasDatabase && !IsBusy;
 
@@ -120,7 +121,7 @@ public partial class MainViewModel : ViewModelBase
     public bool CanEnableWriteMode => !IsOpenCodeRunning && ReadOnlyMode;
 
     public string ProjectCountDisplay => HasDatabase
-        ? $"{FilteredProjects.Count} of {Projects.Count} project{(Projects.Count == 1 ? string.Empty : "s")}"
+        ? $"{FilteredProjects.Count} of {Projects.Count} item{(Projects.Count == 1 ? string.Empty : "s")}"
         : "No database loaded";
 
     public string DatabaseSizeDisplay => Snapshot is null
@@ -128,8 +129,8 @@ public partial class MainViewModel : ViewModelBase
         : DatabaseCandidate.FormatBytes(Snapshot.FileSizeBytes);
 
     public string BackupStatusDisplay => string.IsNullOrWhiteSpace(LastBackupPath)
-        ? "Backup: created once before the first deletion"
-        : $"Backup: {LastBackupPath}";
+        ? "Backup: not created. Use Backup now if you need a recovery point."
+        : $"Latest backup: {LastBackupPath}";
 
     public string DatabasePathDisplay => string.IsNullOrWhiteSpace(DatabasePath)
         ? "No database selected"
@@ -217,21 +218,29 @@ public partial class MainViewModel : ViewModelBase
             Snapshot = snapshot;
             SchemaWarning = snapshot.SchemaWarning;
             Projects.Clear();
-            foreach (var project in snapshot.Projects)
+
+            var items = snapshot.Projects
+                .Where(project => !project.IsGlobal)
+                .Select(ProjectListItem.FromProject)
+                .Concat(snapshot.GlobalSessions.Select(ProjectListItem.FromGlobalSession))
+                .OrderByDescending(item => item.SortTimestamp)
+                .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            foreach (var item in items)
             {
-                Projects.Add(project);
+                Projects.Add(item);
             }
 
-            LastBackupPath = _backupService.GetExistingBackup(path);
             ApplyFilter();
 
             var previousId = SelectedProject?.Id;
             SelectedProject = previousId is not null
-                ? FilteredProjects.FirstOrDefault(project => project.Id == previousId)
+                ? FilteredProjects.FirstOrDefault(item => item.Id == previousId)
                 : FilteredProjects.FirstOrDefault();
 
             StatusMessage =
-                $"Loaded {snapshot.Projects.Count} project{(snapshot.Projects.Count == 1 ? string.Empty : "s")} " +
+                $"Loaded {items.Length} item{(items.Length == 1 ? string.Empty : "s")} " +
                 $"from {ProjectRecord.ToDisplayPath(path)}.";
             ErrorMessage = null;
         }
@@ -242,6 +251,7 @@ public partial class MainViewModel : ViewModelBase
             ApplyFilter();
             SelectedProject = null;
             SelectedDetails = null;
+            SelectedGlobalSessionDetails = null;
             ErrorMessage = exception.Message;
             StatusMessage = "Could not load the database.";
         }
@@ -320,8 +330,34 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
+        var selected = SelectedProject;
         DeleteConfirmed = false;
-        DeletePreviewText = BuildDeletePreview(SelectedProject, SelectedDetails);
+
+        if (selected.IsProject && selected.Project is { } project)
+        {
+            DeleteConfirmationTitle = "Delete project permanently?";
+            DeleteConfirmationDescription =
+                "This removes the project and all of its sessions from the OpenCode database. It cannot be undone from the app.";
+            DeleteConfirmationCheckboxText =
+                "I understand that the project and all of its sessions will be deleted.";
+            DeleteConfirmationButtonText = "Delete permanently";
+            DeletePreviewText = BuildDeletePreview(project, SelectedDetails);
+        }
+        else if (selected.IsGlobalSession && selected.GlobalSession is { } session)
+        {
+            DeleteConfirmationTitle = "Delete session permanently?";
+            DeleteConfirmationDescription =
+                "This removes this global session and its child sessions from the OpenCode database. The global project row and all other sessions are kept.";
+            DeleteConfirmationCheckboxText =
+                "I understand that this session and its child sessions will be deleted.";
+            DeleteConfirmationButtonText = "Delete session";
+            DeletePreviewText = BuildDeleteSessionPreview(session, SelectedGlobalSessionDetails);
+        }
+        else
+        {
+            return;
+        }
+
         IsDeleteConfirmationVisible = true;
         NotifyState();
     }
@@ -331,33 +367,6 @@ public partial class MainViewModel : ViewModelBase
     {
         IsDeleteConfirmationVisible = false;
         DeleteConfirmed = false;
-        NotifyState();
-    }
-
-    [RelayCommand]
-    private async Task ShowDeleteSessionsConfirmationAsync()
-    {
-        if (!CanDeleteSessions || SelectedProject is null)
-        {
-            return;
-        }
-
-        if (!await EnsureDetailsLoadedAsync())
-        {
-            return;
-        }
-
-        DeleteSessionsConfirmed = false;
-        DeleteSessionsPreviewText = BuildDeleteSessionsPreview(SelectedProject, SelectedDetails);
-        IsDeleteSessionsConfirmationVisible = true;
-        NotifyState();
-    }
-
-    [RelayCommand]
-    private void CancelDeleteSessions()
-    {
-        IsDeleteSessionsConfirmationVisible = false;
-        DeleteSessionsConfirmed = false;
         NotifyState();
     }
 
@@ -376,102 +385,46 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var project = SelectedProject;
+        var selected = SelectedProject;
         var path = DatabasePath;
         IsDeleteConfirmationVisible = false;
         DeleteConfirmed = false;
         IsBusy = true;
         ErrorMessage = null;
-        StatusMessage = $"Deleting “{project.DisplayName}”…";
+        StatusMessage = $"Deleting “{selected.DisplayName}”…";
 
         var progress = new Progress<string>(message => StatusMessage = message);
 
         try
         {
-            var backupPath = await Task.Run(() => _backupService.EnsureBackup(path, progress));
-            LastBackupPath = backupPath;
-
-            // Backup can take a long time for a large database. Re-check right before
-            // the write transaction so a newly started OpenCode instance aborts it.
-            if (await StopIfOpenCodeRunningAsync(
-                    "OpenCode started while the backup was running. Deletion was cancelled; the backup is ready."))
+            if (selected.IsProject && selected.Project is { } project)
             {
-                StatusMessage = "Deletion cancelled: OpenCode is running.";
-                return;
+                var result = await Task.Run(() =>
+                    new OpenCodeDatabase(path).DeleteProject(project.Id, progress));
+
+                await LoadAsync(force: true);
+
+                StatusMessage =
+                    $"Deleted “{result.ProjectName}”: {result.TotalSessions:N0} session(s), " +
+                    $"{result.Messages:N0} message(s), {result.Worktrees:N0} worktree(s), " +
+                    $"{result.OrphanedBlobs:N0} orphaned blob(s).";
             }
+            else if (selected.IsGlobalSession && selected.GlobalSession is { } session)
+            {
+                var result = await Task.Run(() =>
+                    new OpenCodeDatabase(path).DeleteSession(session.Id, progress));
 
-            var result = await Task.Run(() =>
-                new OpenCodeDatabase(path).DeleteProject(project.Id, backupPath, progress));
+                await LoadAsync(force: true);
 
-            await LoadAsync(force: true);
-
-            StatusMessage =
-                $"Deleted “{result.ProjectName}”: {result.TotalSessions:N0} session(s), " +
-                $"{result.Messages:N0} message(s), {result.Worktrees:N0} worktree(s), " +
-                $"{result.OrphanedBlobs:N0} orphaned blob(s). Backup: {result.BackupPath}";
+                StatusMessage =
+                    $"Deleted session “{result.ProjectName}”: {result.TotalSessions:N0} session(s), " +
+                    $"{result.Messages:N0} message(s), {result.OrphanedBlobs:N0} orphaned blob(s).";
+            }
         }
         catch (Exception exception)
         {
             ErrorMessage = exception.Message;
             StatusMessage = "Deletion failed. The transaction was rolled back.";
-        }
-        finally
-        {
-            IsBusy = false;
-            NotifyState();
-        }
-    }
-
-    [RelayCommand]
-    private async Task ConfirmDeleteSessionsAsync()
-    {
-        if (!CanConfirmDeleteSessions || SelectedProject is null)
-        {
-            return;
-        }
-
-        if (await StopIfOpenCodeRunningAsync(
-                "OpenCode started while the confirmation dialog was open. Close it and try again."))
-        {
-            IsDeleteSessionsConfirmationVisible = false;
-            return;
-        }
-
-        var project = SelectedProject;
-        var path = DatabasePath;
-        IsDeleteSessionsConfirmationVisible = false;
-        DeleteSessionsConfirmed = false;
-        IsBusy = true;
-        ErrorMessage = null;
-        StatusMessage = $"Deleting sessions of “{project.DisplayName}”…";
-
-        var progress = new Progress<string>(message => StatusMessage = message);
-
-        try
-        {
-            var backupPath = await Task.Run(() => _backupService.EnsureBackup(path, progress));
-            LastBackupPath = backupPath;
-
-            if (await StopIfOpenCodeRunningAsync(
-                    "OpenCode started while the backup was running. Session deletion was cancelled; the backup is ready."))
-            {
-                StatusMessage = "Session deletion cancelled: OpenCode is running.";
-                return;
-            }
-
-            var result = await Task.Run(() =>
-                new OpenCodeDatabase(path).DeleteSessions(project.Id, backupPath, progress));
-
-            await LoadAsync(force: true);
-
-            StatusMessage =
-                $"Deleted {result.TotalSessions:N0} session(s) from “{result.ProjectName}”. " +
-                $"The project row was kept. Backup: {result.BackupPath}";
-        }
-        catch (Exception exception)
-        {
-            ErrorMessage = exception.Message;
-            StatusMessage = "Session deletion failed. The transaction was rolled back.";
         }
         finally
         {
@@ -500,10 +453,8 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            LastBackupPath = await Task.Run(() => _backupService.EnsureBackup(DatabasePath, progress));
-            StatusMessage = _backupService.GetExistingBackup(DatabasePath) is { } existing
-                ? $"Backup ready: {existing}"
-                : "Backup created.";
+            LastBackupPath = await Task.Run(() => _backupService.CreateBackup(DatabasePath, progress));
+            StatusMessage = $"Backup created: {LastBackupPath}";
         }
         catch (Exception exception)
         {
@@ -555,7 +506,7 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnSearchTextChanged(string value) => ApplyFilter();
 
-    partial void OnSelectedProjectChanged(ProjectRecord? value)
+    partial void OnSelectedProjectChanged(ProjectListItem? value)
     {
         _ = LoadDetailsAsync(value);
         NotifyState();
@@ -596,38 +547,60 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnDeleteConfirmedChanged(bool value) => OnPropertyChanged(nameof(CanConfirmDelete));
 
-    partial void OnDeleteSessionsConfirmedChanged(bool value) =>
-        OnPropertyChanged(nameof(CanConfirmDeleteSessions));
-
     partial void OnLastBackupPathChanged(string? value) => OnPropertyChanged(nameof(BackupStatusDisplay));
 
-    private async Task LoadDetailsAsync(ProjectRecord? project)
+    private async Task LoadDetailsAsync(ProjectListItem? item)
     {
         var version = ++_detailsVersion;
 
-        if (project is null)
+        if (item is null)
         {
             SelectedDetails = null;
+            SelectedGlobalSessionDetails = null;
             IsDetailsLoading = false;
             return;
         }
 
         SelectedDetails = null;
+        SelectedGlobalSessionDetails = null;
         IsDetailsLoading = true;
 
         try
         {
-            var details = await Task.Run(() => new OpenCodeDatabase(DatabasePath).LoadDetails(project.Id));
-
-            if (version != _detailsVersion || SelectedProject?.Id != project.Id)
+            if (item.IsProject && item.Project is { } project)
             {
-                return;
+                var details = await Task.Run(() => new OpenCodeDatabase(DatabasePath).LoadDetails(project.Id));
+
+                if (version != _detailsVersion ||
+                    SelectedProject?.Id != item.Id ||
+                    SelectedProject.Kind != item.Kind)
+                {
+                    return;
+                }
+
+                SelectedDetails = details;
+                if (IsDeleteConfirmationVisible)
+                {
+                    DeletePreviewText = BuildDeletePreview(project, details);
+                }
             }
-
-            SelectedDetails = details;
-            if (IsDeleteConfirmationVisible)
+            else if (item.IsGlobalSession && item.GlobalSession is { } session)
             {
-                DeletePreviewText = BuildDeletePreview(project, details);
+                var details = await Task.Run(() =>
+                    new OpenCodeDatabase(DatabasePath).LoadGlobalSessionDetails(session.Id));
+
+                if (version != _detailsVersion ||
+                    SelectedProject?.Id != item.Id ||
+                    SelectedProject.Kind != item.Kind)
+                {
+                    return;
+                }
+
+                SelectedGlobalSessionDetails = details;
+                if (IsDeleteConfirmationVisible)
+                {
+                    DeletePreviewText = BuildDeleteSessionPreview(session, details);
+                }
             }
         }
         catch (Exception exception)
@@ -653,24 +626,48 @@ public partial class MainViewModel : ViewModelBase
             return false;
         }
 
-        if (SelectedDetails is not null)
+        var item = SelectedProject;
+
+        if (item.IsProject && SelectedDetails is not null)
         {
             return true;
         }
 
-        var project = SelectedProject;
+        if (item.IsGlobalSession && SelectedGlobalSessionDetails is not null)
+        {
+            return true;
+        }
+
         IsDetailsLoading = true;
 
         try
         {
-            var details = await Task.Run(() => new OpenCodeDatabase(DatabasePath).LoadDetails(project.Id));
-            if (SelectedProject?.Id != project.Id)
+            if (item.IsProject && item.Project is { } project)
             {
-                return false;
+                var details = await Task.Run(() => new OpenCodeDatabase(DatabasePath).LoadDetails(project.Id));
+                if (SelectedProject?.Id != item.Id || SelectedProject.Kind != item.Kind)
+                {
+                    return false;
+                }
+
+                SelectedDetails = details;
+                return true;
             }
 
-            SelectedDetails = details;
-            return true;
+            if (item.IsGlobalSession && item.GlobalSession is { } session)
+            {
+                var details = await Task.Run(() =>
+                    new OpenCodeDatabase(DatabasePath).LoadGlobalSessionDetails(session.Id));
+                if (SelectedProject?.Id != item.Id || SelectedProject.Kind != item.Kind)
+                {
+                    return false;
+                }
+
+                SelectedGlobalSessionDetails = details;
+                return true;
+            }
+
+            return false;
         }
         catch (Exception exception)
         {
@@ -700,19 +697,21 @@ public partial class MainViewModel : ViewModelBase
     {
         var query = SearchText.Trim();
         var selectedId = SelectedProject?.Id;
+        var selectedKind = SelectedProject?.Kind;
 
         FilteredProjects.Clear();
-        foreach (var project in Projects)
+        foreach (var item in Projects)
         {
-            if (query.Length > 0 && !Matches(project, query))
+            if (query.Length > 0 && !Matches(item, query))
             {
                 continue;
             }
 
-            FilteredProjects.Add(project);
+            FilteredProjects.Add(item);
         }
 
-        if (selectedId is not null && FilteredProjects.All(project => project.Id != selectedId))
+        if (selectedId is not null &&
+            FilteredProjects.All(item => item.Id != selectedId || item.Kind != selectedKind))
         {
             SelectedProject = FilteredProjects.FirstOrDefault();
         }
@@ -722,31 +721,32 @@ public partial class MainViewModel : ViewModelBase
         NotifyState();
     }
 
-    private static bool Matches(ProjectRecord project, string query) =>
-        project.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-        project.CanonicalPath.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-        project.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-        (project.Vcs?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
+    private static bool Matches(ProjectListItem item, string query) =>
+        item.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+        item.PathDisplay.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+        item.Id.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+        (item.Vcs?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
 
-    private string BuildDeleteSessionsPreview(ProjectRecord project, ProjectDetails? details)
+    private string BuildDeleteSessionPreview(GlobalSessionRecord session, GlobalSessionDetails? details)
     {
         var builder = new StringBuilder();
-        builder.AppendLine($"Project: {project.DisplayName}");
-        builder.AppendLine("Type: built-in global project");
+        builder.AppendLine($"Session: {session.DisplayName}");
+        builder.AppendLine($"Path: {session.PathDisplay}");
+        builder.AppendLine($"ID: {session.Id}");
+        builder.AppendLine("Project: global");
         builder.AppendLine();
-        builder.AppendLine($"Sessions (V2): {project.SessionCount:N0}");
-        builder.AppendLine($"Legacy sessions: {project.LegacySessionCount:N0}");
-        builder.AppendLine($"Messages: {(details?.TotalMessageCount ?? 0):N0}");
+        builder.AppendLine($"Messages: {(details?.TotalMessageCount ?? session.MessageCount + session.LegacyMessageCount):N0}");
         builder.AppendLine($"Schedules: {(details?.ScheduleCount ?? 0):N0}");
         builder.AppendLine($"Jobs: {(details?.JobCount ?? 0):N0}");
         builder.AppendLine($"Event streams: {(details?.EventSequenceCount ?? 0):N0}");
+        builder.AppendLine($"Child sessions: {(details?.ChildSessionCount ?? 0):N0}");
         builder.AppendLine();
-        builder.AppendLine("The global project row, its worktrees, permissions and directories are kept.");
+        builder.AppendLine("The global project row, its worktrees, permissions and all other sessions are kept.");
         builder.AppendLine("The folder on disk is not touched.");
         builder.AppendLine();
         builder.AppendLine(string.IsNullOrWhiteSpace(LastBackupPath)
-            ? "A one-time backup will be created before the deletion."
-            : $"Existing backup for this run: {LastBackupPath}");
+            ? "No backup has been created in this run. Use Backup now before deleting if you need a recovery point."
+            : $"Latest backup: {LastBackupPath}");
 
         return builder.ToString();
     }
@@ -771,8 +771,8 @@ public partial class MainViewModel : ViewModelBase
         builder.AppendLine("The folder on disk is NOT deleted. Only OpenCode database rows are removed.");
         builder.AppendLine();
         builder.AppendLine(string.IsNullOrWhiteSpace(LastBackupPath)
-            ? "A one-time backup will be created before the deletion."
-            : $"Existing backup for this run: {LastBackupPath}");
+            ? "No backup has been created in this run. Use Backup now before deleting if you need a recovery point."
+            : $"Latest backup: {LastBackupPath}");
 
         return builder.ToString();
     }
@@ -781,10 +781,10 @@ public partial class MainViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(HasDatabase));
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(IsProjectSelected));
+        OnPropertyChanged(nameof(IsGlobalSessionSelected));
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanConfirmDelete));
-        OnPropertyChanged(nameof(CanDeleteSessions));
-        OnPropertyChanged(nameof(CanConfirmDeleteSessions));
         OnPropertyChanged(nameof(CanEnableWriteMode));
         OnPropertyChanged(nameof(IsNoDatabaseVisible));
         OnPropertyChanged(nameof(IsDetailsPlaceholderVisible));

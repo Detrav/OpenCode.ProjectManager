@@ -259,7 +259,7 @@
                                  SelectionChanged="ProjectList_SelectionChanged"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="models:ProjectRecord">
+                                <DataTemplate x:DataType="models:ProjectListItem">
                                     <Border Padding="10" CornerRadius="8">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <StackPanel Spacing="2">
@@ -320,7 +320,8 @@
             <Border Grid.Column="2" Classes="card">
                 <Grid>
                     <ScrollViewer x:Name="DetailsScrollViewer" IsVisible="{Binding HasSelection}">
-                        <StackPanel Margin="20" Spacing="16">
+                        <StackPanel Margin="20">
+                            <StackPanel Spacing="16" IsVisible="{Binding IsProjectSelected}">
 
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel Spacing="4">
@@ -555,17 +556,191 @@
                             </Grid>
 
                             <Border Classes="dangerZone">
-                                <Grid>
-                                    <!-- Regular project -->
-                                    <StackPanel Spacing="8" IsVisible="{Binding !SelectedDetails.Project.IsGlobal}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Danger zone"
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFB4AB" />
+                                    <TextBlock Text="Permanently removes the project and every session, message, worktree row and event stream that belongs to it. The folder on disk is not touched."
+                                               Classes="muted"
+                                               FontSize="11"
+                                               TextWrapping="Wrap" />
+                                    <Button Content="Delete project permanently…"
+                                            Classes="danger"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding ShowDeleteConfirmationCommand}"
+                                            IsEnabled="{Binding CanDelete}" />
+                                    <TextBlock Text="Deletion is disabled while OpenCode is running or while read-only mode is active."
+                                               Classes="muted"
+                                               FontSize="10"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            </StackPanel>
+
+                            <!-- Global session details -->
+                            <StackPanel Spacing="16" IsVisible="{Binding IsGlobalSessionSelected}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding SelectedGlobalSessionDetails.Session.DisplayName}"
+                                                   Classes="title"
+                                                   TextWrapping="Wrap" />
+                                        <SelectableTextBlock Text="{Binding SelectedGlobalSessionDetails.Session.PathDisplay}"
+                                                             Classes="muted"
+                                                             TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1"
+                                                Spacing="5"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                Margin="16,0,0,0">
+                                        <Border Classes="badge" HorizontalAlignment="Right">
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.Session.StateDisplay}"
+                                                       FontSize="10"
+                                                       Classes="muted" />
+                                        </Border>
+                                        <TextBlock Text="{Binding SelectedGlobalSessionDetails.Session.Id}"
+                                                   Classes="muted mono"
+                                                   FontSize="10"
+                                                   TextWrapping="Wrap"
+                                                   MaxWidth="240"
+                                                   TextAlignment="Right" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel IsVisible="{Binding IsDetailsLoading}" Spacing="6">
+                                    <TextBlock Text="Loading session details…" Classes="muted" FontSize="12" />
+                                    <ProgressBar IsIndeterminate="True" Height="3" />
+                                </StackPanel>
+
+                                <WrapPanel>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Messages" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.MessagesDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="V2 + legacy" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Parts" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.PartsDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="message parts" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Schedules" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.SchedulesDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="session schedules" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Jobs" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.JobsDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="background jobs" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Event streams" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.EventSequencesDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="removed manually" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Blob refs" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.BlobReferencesDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="media references" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Classes="stat">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Child sessions" Classes="muted" FontSize="10" />
+                                            <TextBlock Text="{Binding SelectedGlobalSessionDetails.ChildSessionsDisplay}"
+                                                       Classes="statValue" />
+                                            <TextBlock Text="deleted with this one" Classes="muted" FontSize="10" />
+                                        </StackPanel>
+                                    </Border>
+                                </WrapPanel>
+
+                                <Border Classes="banner info">
+                                    <TextBlock Text="This entry is a session inside the built-in global project. Deleting it removes only this session and its child sessions; the global project row and all other sessions are kept."
+                                               Foreground="#8CC8FF"
+                                               TextWrapping="Wrap" />
+                                </Border>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Metadata" Classes="sectionTitle" />
+                                        <Border Classes="section">
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                                                  ColumnSpacing="10" RowSpacing="5">
+                                                <TextBlock Text="Created" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.CreatedDisplay}"
+                                                           FontSize="11" />
+                                                <TextBlock Grid.Row="1" Text="Last active" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.LastActiveDisplay}"
+                                                           FontSize="11" />
+                                                <TextBlock Grid.Row="2" Text="Archived" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.ArchivedDisplay}"
+                                                           FontSize="11" />
+                                                <TextBlock Grid.Row="3" Text="Agent" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.AgentDisplay}"
+                                                           FontSize="11" />
+                                                <TextBlock Grid.Row="4" Text="Model" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="4" Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.ModelDisplay}"
+                                                           FontSize="11" />
+                                                <TextBlock Grid.Row="5" Text="Slug" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="5" Grid.Column="1"
+                                                           Text="{Binding SelectedGlobalSessionDetails.Session.Slug}"
+                                                           FontSize="11" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <TextBlock Text="Database" Classes="sectionTitle" />
+                                        <Border Classes="section">
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
+                                                  ColumnSpacing="10" RowSpacing="5">
+                                                <TextBlock Text="File" Classes="muted" FontSize="11" />
+                                                <SelectableTextBlock Grid.Column="1"
+                                                                     Text="{Binding DatabasePathDisplay}"
+                                                                     FontSize="11"
+                                                                     TextWrapping="Wrap" />
+                                                <TextBlock Grid.Row="1" Text="Size" Classes="muted" FontSize="11" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                                           Text="{Binding DatabaseSizeDisplay}"
+                                                           FontSize="11" />
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Border Classes="dangerZone">
+                                    <StackPanel Spacing="8">
                                         <TextBlock Text="Danger zone"
                                                    FontWeight="SemiBold"
                                                    Foreground="#FFB4AB" />
-                                        <TextBlock Text="Permanently removes the project and every session, message, worktree row and event stream that belongs to it. The folder on disk is not touched."
+                                        <TextBlock Text="Permanently removes this global session and its child sessions, including messages, schedules, jobs and event streams. The global project row and other sessions are kept."
                                                    Classes="muted"
                                                    FontSize="11"
                                                    TextWrapping="Wrap" />
-                                        <Button Content="Delete project permanently…"
+                                        <Button Content="Delete session permanently…"
                                                 Classes="danger"
                                                 HorizontalAlignment="Left"
                                                 Command="{Binding ShowDeleteConfirmationCommand}"
@@ -575,28 +750,8 @@
                                                    FontSize="10"
                                                    TextWrapping="Wrap" />
                                     </StackPanel>
-
-                                    <!-- Built-in global project: sessions only -->
-                                    <StackPanel Spacing="8" IsVisible="{Binding SelectedDetails.Project.IsGlobal}">
-                                        <TextBlock Text="Global sessions"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="#FFB4AB" />
-                                        <TextBlock Text="The global project row cannot be removed, but every session in it can be deleted. Worktrees, permissions and the project row are kept."
-                                                   Classes="muted"
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap" />
-                                        <Button Content="Delete all global sessions…"
-                                                Classes="danger"
-                                                HorizontalAlignment="Left"
-                                                Command="{Binding ShowDeleteSessionsConfirmationCommand}"
-                                                IsEnabled="{Binding CanDeleteSessions}" />
-                                        <TextBlock Text="Session deletion is disabled while OpenCode is running or while read-only mode is active."
-                                                   Classes="muted"
-                                                   FontSize="10"
-                                                   TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
+                                </Border>
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
 
@@ -605,11 +760,11 @@
                                 VerticalAlignment="Center"
                                 Spacing="8"
                                 Margin="30">
-                        <TextBlock Text="Select a project"
+                        <TextBlock Text="Select a project or global session"
                                    FontSize="18"
                                    FontWeight="SemiBold"
                                    HorizontalAlignment="Center" />
-                        <TextBlock Text="Project metadata, sessions, worktrees and the delete action appear here."
+                        <TextBlock Text="Metadata, related rows and the delete action appear here."
                                    Classes="muted"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
@@ -696,11 +851,11 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="Delete project permanently?"
+                    <TextBlock Text="{Binding DeleteConfirmationTitle}"
                                FontSize="24"
                                FontWeight="SemiBold"
                                Foreground="#FFB4AB" />
-                    <TextBlock Text="This removes the project and all of its sessions from the OpenCode database. It cannot be undone from the app; the one-time backup is your recovery path."
+                    <TextBlock Text="{Binding DeleteConfirmationDescription}"
                                TextWrapping="Wrap"
                                Classes="muted" />
                     <Border Background="#10151B"
@@ -714,60 +869,16 @@
                                              TextWrapping="Wrap" />
                     </Border>
                     <CheckBox IsChecked="{Binding DeleteConfirmed, Mode=TwoWay}"
-                              Content="I understand that the project and all of its sessions will be deleted."
+                              Content="{Binding DeleteConfirmationCheckboxText}"
                               Foreground="#E6EDF3" />
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                         <Button Content="Cancel"
                                 Classes="ghost"
                                 Command="{Binding CancelDeleteCommand}" />
-                        <Button Content="Delete permanently"
+                        <Button Content="{Binding DeleteConfirmationButtonText}"
                                 Classes="danger"
                                 Command="{Binding ConfirmDeleteCommand}"
                                 IsEnabled="{Binding CanConfirmDelete}" />
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-        </Border>
-
-        <!-- Global sessions confirmation overlay -->
-        <Border Grid.RowSpan="5" Background="#E60A0D12" IsVisible="{Binding IsDeleteSessionsConfirmationVisible}">
-            <Border Background="#151A21"
-                    BorderBrush="#5B252B"
-                    BorderThickness="1"
-                    CornerRadius="14"
-                    Padding="28"
-                    MaxWidth="760"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center">
-                <StackPanel Spacing="14">
-                    <TextBlock Text="Delete all global sessions?"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="#FFB4AB" />
-                    <TextBlock Text="This removes every session from the built-in global project, including archived sessions. The project row, worktrees, permissions and the folder on disk are kept."
-                               TextWrapping="Wrap"
-                               Classes="muted" />
-                    <Border Background="#10151B"
-                            BorderBrush="#2A3340"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="12">
-                        <SelectableTextBlock Text="{Binding DeleteSessionsPreviewText}"
-                                             FontFamily="Consolas"
-                                             FontSize="11"
-                                             TextWrapping="Wrap" />
-                    </Border>
-                    <CheckBox IsChecked="{Binding DeleteSessionsConfirmed, Mode=TwoWay}"
-                              Content="I understand that all global sessions will be deleted."
-                              Foreground="#E6EDF3" />
-                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-                        <Button Content="Cancel"
-                                Classes="ghost"
-                                Command="{Binding CancelDeleteSessionsCommand}" />
-                        <Button Content="Delete sessions"
-                                Classes="danger"
-                                Command="{Binding ConfirmDeleteSessionsCommand}"
-                                IsEnabled="{Binding CanConfirmDeleteSessions}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

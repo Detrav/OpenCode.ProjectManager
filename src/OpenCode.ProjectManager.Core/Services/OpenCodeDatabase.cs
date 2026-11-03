@@ -48,6 +48,34 @@ public sealed class OpenCodeDatabase
         return ValidateSchema(connection);
     }
 
+    public GlobalSessionDetails LoadGlobalSessionDetails(string sessionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+
+        using var connection = OpenConnection(SqliteOpenMode.ReadOnly);
+        var snapshot = Load(connection);
+        var session = snapshot.GlobalSessions.FirstOrDefault(item =>
+            string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+
+        if (session is null)
+        {
+            throw new OpenCodeDatabaseException($"Global session '{sessionId}' was not found in the database.");
+        }
+
+        var tables = GetTables(connection);
+        return new GlobalSessionDetails(
+            session,
+            CountSimple(connection, tables, "session_message", "session_id", sessionId),
+            CountSimple(connection, tables, "message", "session_id", sessionId),
+            CountSimple(connection, tables, "session_part", "session_id", sessionId),
+            CountSimple(connection, tables, "schedule", "session_id", sessionId),
+            CountSimple(connection, tables, "job", "session_id", sessionId) +
+            CountSimple(connection, tables, "job", "child_session_id", sessionId),
+            CountSimple(connection, tables, "blob_ref", "session_id", sessionId),
+            CountSimple(connection, tables, "event_sequence", "aggregate_id", sessionId),
+            CountSimple(connection, tables, "session_v2", "parent_id", sessionId));
+    }
+
     public ProjectDetails LoadDetails(string projectId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
@@ -86,7 +114,6 @@ public sealed class OpenCodeDatabase
 
     public DeleteResult DeleteProject(
         string projectId,
-        string? backupPath,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -210,8 +237,7 @@ public sealed class OpenCodeDatabase
                 messageCount,
                 eventSequences,
                 jobCount,
-                orphanedBlobs,
-                backupPath);
+                orphanedBlobs);
         }
         catch
         {
@@ -229,16 +255,15 @@ public sealed class OpenCodeDatabase
     }
 
     /// <summary>
-    /// Deletes every session in a project while keeping the project row, its worktrees,
-    /// its permissions and its directories. Intended for the built-in global project.
+    /// Deletes one session and its child sessions. Used for entries shown from the
+    /// built-in global project, where each session appears as a standalone list item.
     /// </summary>
-    public DeleteResult DeleteSessions(
-        string projectId,
-        string? backupPath,
+    public DeleteResult DeleteSession(
+        string sessionId,
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
 
         using var connection = OpenConnection(SqliteOpenMode.ReadWrite);
 
@@ -251,38 +276,25 @@ public sealed class OpenCodeDatabase
         EnsureCompatible(connection);
 
         var tables = GetTables(connection);
-        var project = ReadProject(connection, tables, projectId)
-            ?? throw new OpenCodeDatabaseException($"Project '{projectId}' no longer exists.");
+        var session = ReadGlobalSession(connection, tables, sessionId)
+            ?? throw new OpenCodeDatabaseException($"Global session '{sessionId}' no longer exists.");
 
-        var sessionIds = ReadSessionIds(connection, tables, projectId);
-        var legacySessionIds = ReadLegacySessionIds(connection, tables, projectId);
-        var allSessionIds = sessionIds
-            .Concat(legacySessionIds)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        var messageCount = CountForProject(connection, tables, "session_message", "session_v2", projectId) +
-                           CountForProject(connection, tables, "message", "session", projectId);
-        var jobCount = CountJobs(connection, tables, projectId);
-
-        if (allSessionIds.Length == 0)
+        var sessionIds = ReadSessionTreeIds(connection, sessionId);
+        if (sessionIds.Count == 0)
         {
-            progress?.Report("No sessions to delete.");
-            return new DeleteResult(
-                project.Id,
-                project.DisplayName,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                backupPath);
+            throw new OpenCodeDatabaseException($"Global session '{sessionId}' no longer exists.");
         }
 
-        progress?.Report($"Deleting {allSessionIds.Length:N0} session(s) from “{project.DisplayName}”…");
+        var legacySessionCount = tables.Contains("session")
+            ? CountInBatches(connection, "session", "id", sessionIds)
+            : 0;
+        var messageCount = CountInBatches(connection, "session_message", "session_id", sessionIds) +
+                           (tables.Contains("message")
+                               ? CountInBatches(connection, "message", "session_id", sessionIds)
+                               : 0);
+        var jobCount = CountJobsForSessions(connection, tables, sessionIds);
+
+        progress?.Report($"Deleting session “{session.DisplayName}” and its child sessions…");
 
         using var transaction = connection.BeginTransaction();
 
@@ -290,36 +302,27 @@ public sealed class OpenCodeDatabase
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            using (var deleteV2 = connection.CreateCommand())
-            {
-                deleteV2.Transaction = transaction;
-                deleteV2.CommandText = "DELETE FROM session_v2 WHERE project_id = $id;";
-                deleteV2.Parameters.AddWithValue("$id", projectId);
-                deleteV2.ExecuteNonQuery();
-            }
+            progress?.Report("Deleting session rows…");
+            DeleteInBatches(connection, transaction, "session_v2", "id", sessionIds, cancellationToken);
 
             if (tables.Contains("session"))
             {
-                using var deleteV1 = connection.CreateCommand();
-                deleteV1.Transaction = transaction;
-                deleteV1.CommandText = "DELETE FROM session WHERE project_id = $id;";
-                deleteV1.Parameters.AddWithValue("$id", projectId);
-                deleteV1.ExecuteNonQuery();
+                DeleteInBatches(connection, transaction, "session", "id", sessionIds, cancellationToken);
             }
 
             if (tables.Contains("job"))
             {
-                progress?.Report($"Removing job rows for {allSessionIds.Length:N0} sessions…");
-                DeleteInBatches(connection, transaction, "job", "session_id", allSessionIds, cancellationToken);
-                DeleteInBatches(connection, transaction, "job", "child_session_id", allSessionIds, cancellationToken);
+                progress?.Report($"Removing job rows for {sessionIds.Count:N0} session(s)…");
+                DeleteInBatches(connection, transaction, "job", "session_id", sessionIds, cancellationToken);
+                DeleteInBatches(connection, transaction, "job", "child_session_id", sessionIds, cancellationToken);
             }
 
             var eventSequences = 0;
             if (tables.Contains("event_sequence"))
             {
-                progress?.Report($"Removing session event streams for {allSessionIds.Length:N0} sessions…");
+                progress?.Report($"Removing event streams for {sessionIds.Count:N0} session(s)…");
                 eventSequences = DeleteInBatches(
-                    connection, transaction, "event_sequence", "aggregate_id", allSessionIds, cancellationToken);
+                    connection, transaction, "event_sequence", "aggregate_id", sessionIds, cancellationToken);
             }
 
             var orphanedBlobs = 0;
@@ -342,17 +345,16 @@ public sealed class OpenCodeDatabase
             transaction.Commit();
 
             return new DeleteResult(
-                project.Id,
-                project.DisplayName,
+                session.ProjectId,
+                session.DisplayName,
                 sessionIds.Count,
-                legacySessionIds.Count,
+                legacySessionCount,
                 0,
                 0,
                 messageCount,
                 eventSequences,
                 jobCount,
-                orphanedBlobs,
-                backupPath);
+                orphanedBlobs);
         }
         catch
         {
@@ -457,6 +459,7 @@ public sealed class OpenCodeDatabase
             });
         }
 
+        var globalSessions = ReadGlobalSessions(connection, tables);
         var info = new FileInfo(_databasePath);
         var warning = validation.Warnings.Count == 0 ? null : validation.WarningSummary;
 
@@ -467,6 +470,7 @@ public sealed class OpenCodeDatabase
             hasLegacySessions,
             hasArchived,
             projects,
+            globalSessions,
             warning)
         {
             FileSizeBytes = info.Exists ? info.Length : 0,
@@ -566,6 +570,103 @@ public sealed class OpenCodeDatabase
         return ReadStrings(command);
     }
 
+    private static List<string> ReadSessionTreeIds(SqliteConnection connection, string sessionId)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            WITH RECURSIVE tree(id) AS (
+                SELECT id FROM session_v2 WHERE id = $id
+                UNION
+                SELECT s.id FROM session_v2 s JOIN tree t ON s.parent_id = t.id
+            )
+            SELECT id FROM tree;
+            """;
+        command.Parameters.AddWithValue("$id", sessionId);
+        return ReadStrings(command);
+    }
+
+    private static GlobalSessionRecord? ReadGlobalSession(
+        SqliteConnection connection,
+        HashSet<string> tables,
+        string sessionId)
+    {
+        return ReadGlobalSessions(connection, tables, sessionId).FirstOrDefault();
+    }
+
+    private static IReadOnlyList<GlobalSessionRecord> ReadGlobalSessions(
+        SqliteConnection connection,
+        HashSet<string> tables,
+        string? sessionId = null)
+    {
+        if (!tables.Contains("session_v2") || !tables.Contains("session_message"))
+        {
+            return [];
+        }
+
+        var columns = GetColumns(connection, "session_v2");
+        string Column(string name, string fallback = "NULL") =>
+            columns.Contains(name) ? $"s.{name}" : fallback;
+
+        var legacyMessageCount = tables.Contains("message")
+            ? "(SELECT COUNT(*) FROM message m WHERE m.session_id = s.id)"
+            : "0";
+        var filter = sessionId is null
+            ? "s.parent_id IS NULL AND s.project_id = 'global'"
+            : "s.id = $id";
+
+        using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT
+                s.id,
+                s.project_id,
+                s.parent_id,
+                s.slug,
+                {Column("title")} AS title,
+                s.directory,
+                {Column("agent")} AS agent,
+                {Column("model")} AS model,
+                s.time_created,
+                s.time_updated,
+                {Column("time_archived")} AS time_archived,
+                (SELECT COUNT(*) FROM session_message m WHERE m.session_id = s.id) AS messages,
+                {legacyMessageCount} AS legacy_messages
+            FROM session_v2 s
+            WHERE {filter}
+            ORDER BY s.time_updated DESC, s.id ASC;
+            """;
+
+        if (sessionId is not null)
+        {
+            command.Parameters.AddWithValue("$id", sessionId);
+        }
+
+        var sessions = new List<GlobalSessionRecord>();
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var directory = reader.GetString(5);
+            sessions.Add(new GlobalSessionRecord
+            {
+                Id = reader.GetString(0),
+                ProjectId = reader.GetString(1),
+                ParentId = reader.IsDBNull(2) ? null : reader.GetString(2),
+                Slug = reader.GetString(3),
+                Title = reader.IsDBNull(4) ? null : reader.GetString(4),
+                Directory = directory,
+                Agent = reader.IsDBNull(6) ? null : reader.GetString(6),
+                Model = reader.IsDBNull(7) ? null : reader.GetString(7),
+                CreatedAt = reader.IsDBNull(8) ? 0 : reader.GetInt64(8),
+                UpdatedAt = reader.IsDBNull(9) ? 0 : reader.GetInt64(9),
+                ArchivedAt = reader.IsDBNull(10) ? null : reader.GetInt64(10),
+                MessageCount = Convert.ToInt32(reader.GetInt64(11), CultureInfo.InvariantCulture),
+                LegacyMessageCount = Convert.ToInt32(reader.GetInt64(12), CultureInfo.InvariantCulture),
+                DirectoryExists = DirectoryExists(directory)
+            });
+        }
+
+        return sessions;
+    }
+
     private static List<string> ReadStrings(SqliteCommand command)
     {
         var values = new List<string>();
@@ -642,6 +743,47 @@ public sealed class OpenCodeDatabase
         }
 
         return directories;
+    }
+
+    private static int CountInBatches(
+        SqliteConnection connection,
+        string table,
+        string column,
+        IReadOnlyCollection<string> values)
+    {
+        var total = 0;
+
+        foreach (var batch in values.Chunk(DeleteBatchSize))
+        {
+            using var command = connection.CreateCommand();
+            var parameterNames = new string[batch.Length];
+
+            for (var index = 0; index < batch.Length; index++)
+            {
+                parameterNames[index] = "$p" + index.ToString(CultureInfo.InvariantCulture);
+                command.Parameters.AddWithValue(parameterNames[index], batch[index]);
+            }
+
+            command.CommandText =
+                $"SELECT COUNT(*) FROM {table} WHERE {column} IN ({string.Join(", ", parameterNames)});";
+            total += Convert.ToInt32(command.ExecuteScalar() ?? 0L, CultureInfo.InvariantCulture);
+        }
+
+        return total;
+    }
+
+    private static int CountJobsForSessions(
+        SqliteConnection connection,
+        HashSet<string> tables,
+        IReadOnlyCollection<string> sessionIds)
+    {
+        if (!tables.Contains("job"))
+        {
+            return 0;
+        }
+
+        return CountInBatches(connection, "job", "session_id", sessionIds) +
+               CountInBatches(connection, "job", "child_session_id", sessionIds);
     }
 
     private static int CountSimple(
@@ -862,7 +1004,7 @@ public sealed class OpenCodeDatabase
         var requiredTables = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["project"] = ["id", "worktree", "time_created", "time_updated", "time_active", "time_archived", "sandboxes"],
-            ["session_v2"] = ["id", "project_id"],
+            ["session_v2"] = ["id", "project_id", "parent_id", "slug", "directory", "time_created", "time_updated"],
             ["session_message"] = ["id", "session_id"],
             ["session_part"] = ["message_id", "session_id"],
             ["worktree"] = ["project_id", "directory", "strategy"],

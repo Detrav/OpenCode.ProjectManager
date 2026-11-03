@@ -287,13 +287,14 @@ internal sealed class TestDatabase : IDisposable
                 ('ses_a1', 'prj_a', NULL, 'alpha-1', 'C:/projects/alpha', 'Alpha one', '2', 1, 1),
                 ('ses_a2', 'prj_a', 'ses_a1', 'alpha-2', 'C:/projects/alpha', 'Alpha two', '2', 1, 1),
                 ('ses_b1', 'prj_b', NULL, 'beta-1', 'C:/projects/beta', 'Beta one', '2', 1, 1),
-                ('ses_global_1', 'global', NULL, 'global-1', 'C:/global', 'Global one', '2', 1, 1);
+                ('ses_global_1', 'global', NULL, 'global-1', 'C:/global', 'Global one', '2', 1, 1),
+                ('ses_global_child', 'global', 'ses_global_1', 'global-child', 'C:/global', 'Global child', '2', 1, 1);
 
             INSERT INTO session (id, project_id, slug, directory, title, version, time_created, time_updated)
             VALUES
                 ('ses_a_legacy', 'prj_a', 'alpha-legacy', 'C:/projects/alpha', 'Alpha legacy', '1', 1, 1),
                 ('ses_b_legacy', 'prj_b', 'beta-legacy', 'C:/projects/beta', 'Beta legacy', '1', 1, 1),
-                ('ses_global_legacy', 'global', 'global-legacy', 'C:/global', 'Global legacy', '1', 1, 1);
+                ('ses_global_1', 'global', 'global-legacy', 'C:/global', 'Global legacy', '1', 1, 1);
 
             INSERT INTO worktree (project_id, directory, strategy, time_created)
             VALUES
@@ -318,23 +319,25 @@ internal sealed class TestDatabase : IDisposable
                 ('msg_a1', 'ses_a1', 'user', 1, 1, 1, '{}'),
                 ('msg_a2', 'ses_a2', 'user', 1, 1, 1, '{}'),
                 ('msg_b1', 'ses_b1', 'user', 1, 1, 1, '{}'),
-                ('msg_global_1', 'ses_global_1', 'user', 1, 1, 1, '{}');
+                ('msg_global_1', 'ses_global_1', 'user', 1, 1, 1, '{}'),
+                ('msg_global_child', 'ses_global_child', 'user', 1, 1, 1, '{}');
 
             INSERT INTO session_part (message_id, session_id, ordinal, type, data, time_created, time_updated)
             VALUES
                 ('msg_a1', 'ses_a1', 0, 'text', '{}', 1, 1),
                 ('msg_b1', 'ses_b1', 0, 'text', '{}', 1, 1),
-                ('msg_global_1', 'ses_global_1', 0, 'text', '{}', 1, 1);
+                ('msg_global_1', 'ses_global_1', 0, 'text', '{}', 1, 1),
+                ('msg_global_child', 'ses_global_child', 0, 'text', '{}', 1, 1);
 
             INSERT INTO message (id, session_id, time_created, time_updated, data)
             VALUES
                 ('msg_a_legacy', 'ses_a_legacy', 1, 1, '{}'),
-                ('msg_global_legacy', 'ses_global_legacy', 1, 1, '{}');
+                ('msg_global_legacy', 'ses_global_1', 1, 1, '{}');
 
             INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
             VALUES
                 ('part_a_legacy', 'msg_a_legacy', 'ses_a_legacy', 1, 1, '{}'),
-                ('part_global_legacy', 'msg_global_legacy', 'ses_global_legacy', 1, 1, '{}');
+                ('part_global_legacy', 'msg_global_legacy', 'ses_global_1', 1, 1, '{}');
 
             INSERT INTO schedule (id, session_id, action, when_value, tz, status, time_created, time_updated)
             VALUES
@@ -369,7 +372,7 @@ internal sealed class TestDatabase : IDisposable
                 ('ses_b1', 2),
                 ('prj_b', 1),
                 ('ses_global_1', 1),
-                ('ses_global_legacy', 1);
+                ('ses_global_child', 1);
 
             INSERT INTO event (id, aggregate_id, seq, created, type, data)
             VALUES
@@ -381,7 +384,7 @@ internal sealed class TestDatabase : IDisposable
                 ('evt_ses_b1', 'ses_b1', 1, 1, 'session.created', '{}'),
                 ('evt_project_b', 'prj_b', 1, 1, 'project.updated', '{}'),
                 ('evt_ses_global_1', 'ses_global_1', 1, 1, 'session.created', '{}'),
-                ('evt_ses_global_legacy', 'ses_global_legacy', 1, 1, 'session.created', '{}');
+                ('evt_ses_global_child', 'ses_global_child', 1, 1, 'session.created', '{}');
             """;
         command.ExecuteNonQuery();
     }
@@ -410,3 +413,4 @@ internal sealed class TestDatabase : IDisposable
         }
     }
 }
+

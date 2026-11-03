@@ -7,6 +7,7 @@ public sealed record DatabaseSnapshot(
     bool HasLegacySessionTable,
     bool HasArchivedColumn,
     IReadOnlyList<ProjectRecord> Projects,
+    IReadOnlyList<GlobalSessionRecord> GlobalSessions,
     string? SchemaWarning = null)
 {
     public bool IsSupported => HasProjectTable && HasSessionV2Table;
