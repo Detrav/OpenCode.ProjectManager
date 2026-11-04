@@ -162,6 +162,10 @@
                             Classes="ghost"
                             Command="{Binding BackupNowCommand}"
                             IsEnabled="{Binding HasDatabase}" />
+                    <Button Content="Compact…"
+                            Classes="ghost"
+                            Command="{Binding ShowCompactConfirmationCommand}"
+                            IsEnabled="{Binding CanCompactDatabase}" />
                     <Button Content="Open folder"
                             Classes="ghost"
                             Command="{Binding OpenDatabaseFolderCommand}"
@@ -250,54 +254,6 @@
                         <TextBox Text="{Binding SearchText}"
                                  PlaceholderText="Search by name, path, VCS or ID" />
                     </StackPanel>
-
-                    <Border DockPanel.Dock="Bottom"
-                            Classes="dangerZone"
-                            Margin="16,0,16,16"
-                            IsVisible="{Binding HasDatabaseSpace}">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Danger zone"
-                                       FontWeight="SemiBold"
-                                       Foreground="#FFB4AB" />
-                            <TextBlock Text="Deleted rows stay in the file as free pages. Compacting rewrites the database and returns that space to disk."
-                                       Classes="muted"
-                                       FontSize="11"
-                                       TextWrapping="Wrap" />
-                            <Grid ColumnDefinitions="Auto,*"
-                                  RowDefinitions="Auto,Auto,Auto"
-                                  ColumnSpacing="10"
-                                  RowSpacing="4">
-                                <TextBlock Text="File" Classes="muted" FontSize="11" />
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding DatabaseSizeDisplay}"
-                                           FontSize="11" />
-                                <TextBlock Grid.Row="1" Text="Live data" Classes="muted" FontSize="11" />
-                                <TextBlock Grid.Row="1"
-                                           Grid.Column="1"
-                                           Text="{Binding DatabaseLiveSizeDisplay}"
-                                           FontSize="11" />
-                                <TextBlock Grid.Row="2" Text="Free pages" Classes="muted" FontSize="11" />
-                                <TextBlock Grid.Row="2"
-                                           Grid.Column="1"
-                                           Text="{Binding DatabaseReclaimableDisplay}"
-                                           FontSize="11" />
-                            </Grid>
-                            <Button Content="Compact database…"
-                                    Classes="danger"
-                                    HorizontalAlignment="Left"
-                                    Command="{Binding ShowCompactConfirmationCommand}"
-                                    IsEnabled="{Binding CanCompactDatabase}" />
-                            <TextBlock Text="The file is already compact: there are no free pages to reclaim."
-                                       Classes="muted"
-                                       FontSize="10"
-                                       TextWrapping="Wrap"
-                                       IsVisible="{Binding !HasReclaimableSpace}" />
-                            <TextBlock Text="Compaction is disabled while OpenCode is running or while read-only mode is active."
-                                       Classes="muted"
-                                       FontSize="10"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
 
                     <Grid Margin="8,0,8,8">
                         <ListBox x:Name="ProjectList"

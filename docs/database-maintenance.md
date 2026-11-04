@@ -19,7 +19,7 @@ Backups are **not created automatically**. The only way to create one is the **B
 
 SQLite never shrinks a database file on its own. Deleted rows leave **free pages** inside the file, which are reused by later writes but not returned to the file system. That is why `opencode.db` can stay at 14 GB while it only holds about 1 GB of data.
 
-The **Compact database…** button in the left panel's danger zone runs:
+The **Compact…** button next to **Backup now** in the header runs:
 
 ```text
 PRAGMA wal_checkpoint(TRUNCATE);

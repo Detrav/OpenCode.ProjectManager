@@ -135,8 +135,6 @@ public partial class MainViewModel : ViewModelBase
 
     public bool HasDatabaseSpace => DatabaseSpace is not null;
 
-    public bool HasReclaimableSpace => DatabaseSpace?.HasReclaimableSpace == true;
-
     public bool CanCompactDatabase =>
         HasDatabaseSpace &&
         Snapshot is { IsSupported: true } &&
@@ -145,16 +143,6 @@ public partial class MainViewModel : ViewModelBase
         !ReadOnlyMode;
 
     public bool CanConfirmCompact => CompactConfirmed && CanCompactDatabase;
-
-    public string DatabaseLiveSizeDisplay => DatabaseSpace is null
-        ? "—"
-        : DatabaseCandidate.FormatBytes(DatabaseSpace.LiveBytes);
-
-    public string DatabaseReclaimableDisplay => DatabaseSpace is null
-        ? "—"
-        : DatabaseSpace.HasReclaimableSpace
-            ? $"{DatabaseCandidate.FormatBytes(DatabaseSpace.ReclaimableBytes)} ({DatabaseSpace.FreePercent:0.#}%)"
-            : "none";
 
     public string ProjectCountDisplay => HasDatabase
         ? $"{FilteredProjects.Count} of {Projects.Count} item{(Projects.Count == 1 ? string.Empty : "s")}"
@@ -939,11 +927,8 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanConfirmDelete));
         OnPropertyChanged(nameof(CanEnableWriteMode));
         OnPropertyChanged(nameof(HasDatabaseSpace));
-        OnPropertyChanged(nameof(HasReclaimableSpace));
         OnPropertyChanged(nameof(CanCompactDatabase));
         OnPropertyChanged(nameof(CanConfirmCompact));
-        OnPropertyChanged(nameof(DatabaseLiveSizeDisplay));
-        OnPropertyChanged(nameof(DatabaseReclaimableDisplay));
         OnPropertyChanged(nameof(IsNoDatabaseVisible));
         OnPropertyChanged(nameof(IsDetailsPlaceholderVisible));
         OnPropertyChanged(nameof(IsEmptyProjectsVisible));

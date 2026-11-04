@@ -15,8 +15,6 @@ public sealed record DatabaseSpaceInfo(
 
     public long ReclaimableBytes => Math.Max(0, FreePageCount) * Math.Max(0, PageSize);
 
-    public bool HasReclaimableSpace => ReclaimableBytes > 0;
-
     public double FreePercent => PageCount <= 0
         ? 0d
         : Math.Max(0, FreePageCount) * 100d / PageCount;
