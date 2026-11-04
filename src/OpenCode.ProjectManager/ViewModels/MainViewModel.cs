@@ -15,6 +15,7 @@ namespace OpenCode.ProjectManager.ViewModels;
 public partial class MainViewModel : ViewModelBase
 {
     private readonly BackupService _backupService = new();
+    private readonly DatabaseMaintenanceService _maintenanceService = new();
     private int _detailsVersion;
     private bool _initialized;
 
@@ -87,6 +88,18 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string? _lastBackupPath;
 
+    [ObservableProperty]
+    private DatabaseSpaceInfo? _databaseSpace;
+
+    [ObservableProperty]
+    private bool _isCompactConfirmationVisible;
+
+    [ObservableProperty]
+    private bool _compactConfirmed;
+
+    [ObservableProperty]
+    private string _compactPreviewText = string.Empty;
+
     public ObservableCollection<ProjectListItem> Projects { get; } = [];
 
     public ObservableCollection<ProjectListItem> FilteredProjects { get; } = [];
@@ -119,6 +132,29 @@ public partial class MainViewModel : ViewModelBase
     public bool IsSchemaWarningVisible => !string.IsNullOrWhiteSpace(SchemaWarning);
 
     public bool CanEnableWriteMode => !IsOpenCodeRunning && ReadOnlyMode;
+
+    public bool HasDatabaseSpace => DatabaseSpace is not null;
+
+    public bool HasReclaimableSpace => DatabaseSpace?.HasReclaimableSpace == true;
+
+    public bool CanCompactDatabase =>
+        HasDatabaseSpace &&
+        Snapshot is { IsSupported: true } &&
+        !IsBusy &&
+        !IsOpenCodeRunning &&
+        !ReadOnlyMode;
+
+    public bool CanConfirmCompact => CompactConfirmed && CanCompactDatabase;
+
+    public string DatabaseLiveSizeDisplay => DatabaseSpace is null
+        ? "—"
+        : DatabaseCandidate.FormatBytes(DatabaseSpace.LiveBytes);
+
+    public string DatabaseReclaimableDisplay => DatabaseSpace is null
+        ? "—"
+        : DatabaseSpace.HasReclaimableSpace
+            ? $"{DatabaseCandidate.FormatBytes(DatabaseSpace.ReclaimableBytes)} ({DatabaseSpace.FreePercent:0.#}%)"
+            : "none";
 
     public string ProjectCountDisplay => HasDatabase
         ? $"{FilteredProjects.Count} of {Projects.Count} item{(Projects.Count == 1 ? string.Empty : "s")}"
@@ -196,6 +232,7 @@ public partial class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
             Snapshot = null;
+            DatabaseSpace = null;
             Projects.Clear();
             ApplyFilter();
             ErrorMessage = string.IsNullOrWhiteSpace(path)
@@ -216,6 +253,7 @@ public partial class MainViewModel : ViewModelBase
             var snapshot = await Task.Run(() => new OpenCodeDatabase(path).Load());
 
             Snapshot = snapshot;
+            DatabaseSpace = TryReadSpaceInfo(path);
             SchemaWarning = snapshot.SchemaWarning;
             Projects.Clear();
 
@@ -247,6 +285,7 @@ public partial class MainViewModel : ViewModelBase
         catch (Exception exception)
         {
             Snapshot = null;
+            DatabaseSpace = null;
             Projects.Clear();
             ApplyFilter();
             SelectedProject = null;
@@ -469,6 +508,78 @@ public partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void ShowCompactConfirmation()
+    {
+        if (!CanCompactDatabase || DatabaseSpace is null)
+        {
+            return;
+        }
+
+        CompactConfirmed = false;
+        CompactPreviewText = BuildCompactPreview(DatabaseSpace);
+        IsCompactConfirmationVisible = true;
+        NotifyState();
+    }
+
+    [RelayCommand]
+    private void CancelCompact()
+    {
+        IsCompactConfirmationVisible = false;
+        CompactConfirmed = false;
+        NotifyState();
+    }
+
+    [RelayCommand]
+    private async Task ConfirmCompactAsync()
+    {
+        if (!CanConfirmCompact || DatabaseSpace is null)
+        {
+            return;
+        }
+
+        if (await StopIfOpenCodeRunningAsync(
+                "OpenCode started while the confirmation dialog was open. Close it and try again."))
+        {
+            IsCompactConfirmationVisible = false;
+            return;
+        }
+
+        var path = DatabasePath;
+        var before = DatabaseSpace;
+        IsCompactConfirmationVisible = false;
+        CompactConfirmed = false;
+        IsBusy = true;
+        ErrorMessage = null;
+        StatusMessage = "Compacting database…";
+
+        var progress = new Progress<string>(message => StatusMessage = message);
+
+        try
+        {
+            var after = await Task.Run(() => _maintenanceService.Compact(path, progress));
+
+            DatabaseSpace = after;
+            await LoadAsync(force: true);
+
+            var freed = Math.Max(0, before.FileSizeBytes - after.FileSizeBytes);
+            StatusMessage =
+                $"Database compacted: {DatabaseCandidate.FormatBytes(before.FileSizeBytes)} → " +
+                $"{DatabaseCandidate.FormatBytes(after.FileSizeBytes)} " +
+                $"({DatabaseCandidate.FormatBytes(freed)} freed).";
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+            StatusMessage = "Compaction failed. The database file was left unchanged.";
+        }
+        finally
+        {
+            IsBusy = false;
+            NotifyState();
+        }
+    }
+
+    [RelayCommand]
     private void DismissError()
     {
         ErrorMessage = null;
@@ -523,6 +634,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _detailsVersion++;
         SelectedDetails = null;
+        DatabaseSpace = null;
         LastBackupPath = null;
         OnPropertyChanged(nameof(DatabasePathDisplay));
     }
@@ -548,6 +660,10 @@ public partial class MainViewModel : ViewModelBase
     partial void OnDeleteConfirmedChanged(bool value) => OnPropertyChanged(nameof(CanConfirmDelete));
 
     partial void OnLastBackupPathChanged(string? value) => OnPropertyChanged(nameof(BackupStatusDisplay));
+
+    partial void OnDatabaseSpaceChanged(DatabaseSpaceInfo? value) => NotifyState();
+
+    partial void OnCompactConfirmedChanged(bool value) => OnPropertyChanged(nameof(CanConfirmCompact));
 
     private async Task LoadDetailsAsync(ProjectListItem? item)
     {
@@ -777,6 +893,42 @@ public partial class MainViewModel : ViewModelBase
         return builder.ToString();
     }
 
+    private DatabaseSpaceInfo? TryReadSpaceInfo(string path)
+    {
+        try
+        {
+            return _maintenanceService.ReadSpaceInfo(path);
+        }
+        catch (Exception)
+        {
+            // Space statistics are informational; a failure must not block loading.
+            return null;
+        }
+    }
+
+    private string BuildCompactPreview(DatabaseSpaceInfo space)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Database: {ProjectRecord.ToDisplayPath(DatabasePath)}");
+        builder.AppendLine($"File size: {DatabaseCandidate.FormatBytes(space.FileSizeBytes)}");
+        builder.AppendLine($"Live data: {DatabaseCandidate.FormatBytes(space.LiveBytes)}");
+        builder.AppendLine(
+            $"Free pages: {DatabaseCandidate.FormatBytes(space.ReclaimableBytes)} " +
+            $"({space.FreePercent:0.#}% of the file)");
+        builder.AppendLine();
+        builder.AppendLine("VACUUM rewrites the whole database file. All rows are kept, but on a large");
+        builder.AppendLine("file this can take several minutes and needs disk space for a temporary copy.");
+        builder.AppendLine("If compaction is interrupted, SQLite leaves the database unchanged.");
+        builder.AppendLine();
+        builder.AppendLine("OpenCode must not be running while the database is compacted.");
+        builder.AppendLine();
+        builder.AppendLine(string.IsNullOrWhiteSpace(LastBackupPath)
+            ? "No backup has been created in this run. Use Backup now before compacting if you need a recovery point."
+            : $"Latest backup: {LastBackupPath}");
+
+        return builder.ToString();
+    }
+
     private void NotifyState()
     {
         OnPropertyChanged(nameof(HasDatabase));
@@ -786,6 +938,12 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanDelete));
         OnPropertyChanged(nameof(CanConfirmDelete));
         OnPropertyChanged(nameof(CanEnableWriteMode));
+        OnPropertyChanged(nameof(HasDatabaseSpace));
+        OnPropertyChanged(nameof(HasReclaimableSpace));
+        OnPropertyChanged(nameof(CanCompactDatabase));
+        OnPropertyChanged(nameof(CanConfirmCompact));
+        OnPropertyChanged(nameof(DatabaseLiveSizeDisplay));
+        OnPropertyChanged(nameof(DatabaseReclaimableDisplay));
         OnPropertyChanged(nameof(IsNoDatabaseVisible));
         OnPropertyChanged(nameof(IsDetailsPlaceholderVisible));
         OnPropertyChanged(nameof(IsEmptyProjectsVisible));

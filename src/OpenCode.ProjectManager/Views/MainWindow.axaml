@@ -251,6 +251,54 @@
                                  PlaceholderText="Search by name, path, VCS or ID" />
                     </StackPanel>
 
+                    <Border DockPanel.Dock="Bottom"
+                            Classes="dangerZone"
+                            Margin="16,0,16,16"
+                            IsVisible="{Binding HasDatabaseSpace}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Danger zone"
+                                       FontWeight="SemiBold"
+                                       Foreground="#FFB4AB" />
+                            <TextBlock Text="Deleted rows stay in the file as free pages. Compacting rewrites the database and returns that space to disk."
+                                       Classes="muted"
+                                       FontSize="11"
+                                       TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="Auto,*"
+                                  RowDefinitions="Auto,Auto,Auto"
+                                  ColumnSpacing="10"
+                                  RowSpacing="4">
+                                <TextBlock Text="File" Classes="muted" FontSize="11" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding DatabaseSizeDisplay}"
+                                           FontSize="11" />
+                                <TextBlock Grid.Row="1" Text="Live data" Classes="muted" FontSize="11" />
+                                <TextBlock Grid.Row="1"
+                                           Grid.Column="1"
+                                           Text="{Binding DatabaseLiveSizeDisplay}"
+                                           FontSize="11" />
+                                <TextBlock Grid.Row="2" Text="Free pages" Classes="muted" FontSize="11" />
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="1"
+                                           Text="{Binding DatabaseReclaimableDisplay}"
+                                           FontSize="11" />
+                            </Grid>
+                            <Button Content="Compact database…"
+                                    Classes="danger"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding ShowCompactConfirmationCommand}"
+                                    IsEnabled="{Binding CanCompactDatabase}" />
+                            <TextBlock Text="The file is already compact: there are no free pages to reclaim."
+                                       Classes="muted"
+                                       FontSize="10"
+                                       TextWrapping="Wrap"
+                                       IsVisible="{Binding !HasReclaimableSpace}" />
+                            <TextBlock Text="Compaction is disabled while OpenCode is running or while read-only mode is active."
+                                       Classes="muted"
+                                       FontSize="10"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
                     <Grid Margin="8,0,8,8">
                         <ListBox x:Name="ProjectList"
                                  ItemsSource="{Binding FilteredProjects}"
@@ -879,6 +927,49 @@
                                 Classes="danger"
                                 Command="{Binding ConfirmDeleteCommand}"
                                 IsEnabled="{Binding CanConfirmDelete}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+        <!-- Compact confirmation overlay -->
+        <Border Grid.RowSpan="5" Background="#E60A0D12" IsVisible="{Binding IsCompactConfirmationVisible}">
+            <Border Background="#151A21"
+                    BorderBrush="#5B252B"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="28"
+                    MaxWidth="760"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Compact database?"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="#FFB4AB" />
+                    <TextBlock Text="VACUUM rebuilds the database file and returns free pages to disk. Data is preserved, but the whole file is rewritten and the operation must not be interrupted."
+                               TextWrapping="Wrap"
+                               Classes="muted" />
+                    <Border Background="#10151B"
+                            BorderBrush="#2A3340"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12">
+                        <SelectableTextBlock Text="{Binding CompactPreviewText}"
+                                             FontFamily="Consolas"
+                                             FontSize="11"
+                                             TextWrapping="Wrap" />
+                    </Border>
+                    <CheckBox IsChecked="{Binding CompactConfirmed, Mode=TwoWay}"
+                              Content="I understand that the database file will be rewritten."
+                              Foreground="#E6EDF3" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Classes="ghost"
+                                Command="{Binding CancelCompactCommand}" />
+                        <Button Content="Compact database"
+                                Classes="danger"
+                                Command="{Binding ConfirmCompactCommand}"
+                                IsEnabled="{Binding CanConfirmCompact}" />
                     </StackPanel>
                 </StackPanel>
             </Border>

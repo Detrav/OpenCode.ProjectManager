@@ -30,6 +30,7 @@ The app works directly with `opencode.db`, validates the schema before showing d
 - Permanent project deletion with confirmation.
 - The built-in **global project** is not shown as an aggregate row. Every root session of that project is shown in the list as its own project-like entry. Deleting such an entry removes only that session and its child sessions; the global project row and all other sessions are kept.
 - Backup only through the **Backup now** button. Every click creates a new backup file.
+- Database maintenance: shows the live data size and free pages in the file, and can compact the file with `VACUUM` after an explicit confirmation.
 - Write blocking while OpenCode is detected, plus a read-only mode for inspecting data.
 
 ## Requirements
@@ -147,6 +148,25 @@ Backups are **not created automatically**. The only way to create one is the **B
 - Free space is checked first; if there is not enough room, the backup fails.
 - Deletion never creates or waits for a backup. If you want a recovery point, press **Backup now** before deleting.
 - A large database can require a backup of the same size (for example, 15 GB).
+- The SQLite backup API copies free pages too, so a backup of a bloated file stays large. Compact the database first if you want compact backups.
+
+## Database compaction
+
+SQLite never shrinks a database file on its own. Deleted rows leave **free pages** inside the file, which are reused by later writes but not returned to the file system. That is why `opencode.db` can stay at 14 GB while it only holds about 1 GB of data.
+
+The **Compact database…** button in the left panel's danger zone runs:
+
+```text
+PRAGMA wal_checkpoint(TRUNCATE);
+VACUUM;
+PRAGMA wal_checkpoint(TRUNCATE);
+```
+
+- The confirmation dialog shows the current file size, live data size and reclaimable free pages.
+- Compaction requires a checked confirmation and is disabled while OpenCode is running or while read-only mode is active.
+- `VACUUM` rewrites the whole file, so it can take several minutes on a large database and needs free disk space for a temporary copy.
+- If the operation is interrupted, SQLite leaves the database unchanged.
+- Only the database rows are affected; project folders on disk are never touched.
 
 ## OpenCode process guard
 
@@ -178,6 +198,7 @@ README.md
 - `DatabaseLocator` — OpenCode/XDG database discovery.
 - `OpenCodeDatabase` — schema validation, project reads, project deletion and global session deletion.
 - `BackupService` — on-demand SQLite backup; each call creates a new file.
+- `DatabaseMaintenanceService` — reports live/free page usage and compacts the file with `VACUUM`.
 - `OpenCodeProcessGuard` — running OpenCode process detection.
 
 ### UI
@@ -199,12 +220,13 @@ The tests create a temporary SQLite database with the V2 and legacy schemas and 
 - preservation of other projects, other global sessions and shared blobs;
 - refusal to delete the `global` project row;
 - rejection of an OpenCode 1-only database;
-- creation of a new backup file on every backup call.
+- creation of a new backup file on every backup call;
+- reporting of SQLite free pages and reclaiming them with `VACUUM` while keeping the data.
 
 ## Limitations
 
 - There is no restore-from-backup UI; a backup is a regular SQLite file that can be opened manually.
-- No automatic `VACUUM` is performed after deletion. The database file may not shrink immediately, but freed pages are reused by SQLite.
+- Deletion does not run `VACUUM` automatically, because compacting a multi-gigabyte file can take a long time. Use **Compact database…** when you want to return free pages to disk.
 - Process detection is based on executable names.
 - The app modifies only `opencode.db`; local desktop-app state (for example, its own recent-project list) may live elsewhere and is not cleaned.
 - Do not run the utility against a database currently in use by OpenCode. The process guard exists specifically to prevent that.
